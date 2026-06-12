@@ -1,3 +1,5 @@
+import { fetchLiveData, plannedSources } from "./live-data.js";
+
 const scenarios = {
   hurricane: {
     label: "Hurricane",
@@ -103,6 +105,9 @@ const ui = {
     document.querySelector("#exposureTelemetry"),
     document.querySelector("#uncertaintyTelemetry"),
   ],
+  feedStatus: document.querySelector("#feedStatus"),
+  liveEventList: document.querySelector("#liveEventList"),
+  refreshFeeds: document.querySelector("#refreshFeeds"),
 };
 
 let activeScenario = "hurricane";
@@ -132,6 +137,10 @@ ui.horizon.addEventListener("input", () => {
   renderScenario();
 });
 
+ui.refreshFeeds.addEventListener("click", () => {
+  refreshLiveFeeds();
+});
+
 async function boot() {
   try {
     const THREE = await import(
@@ -141,10 +150,85 @@ async function boot() {
     engine = createEarthEngine(THREE, ui.canvas);
     setScenario(activeScenario);
     engine.animate();
+    refreshLiveFeeds();
   } catch (error) {
     console.error(error);
     ui.fallback.hidden = false;
   }
+}
+
+async function refreshLiveFeeds() {
+  ui.refreshFeeds.disabled = true;
+  ui.refreshFeeds.textContent = "Loading";
+  renderFeedStatus({
+    sources: [],
+    events: [],
+    updatedAt: new Date().toISOString(),
+    loading: true,
+  });
+
+  try {
+    const liveData = await fetchLiveData();
+    renderFeedStatus(liveData);
+    engine?.setLiveEvents(liveData.events);
+  } catch (error) {
+    renderFeedStatus({
+      sources: [],
+      events: [],
+      updatedAt: new Date().toISOString(),
+      error: error.message,
+    });
+  } finally {
+    ui.refreshFeeds.disabled = false;
+    ui.refreshFeeds.textContent = "Refresh";
+  }
+}
+
+function renderFeedStatus(liveData) {
+  if (liveData.loading) {
+    ui.feedStatus.innerHTML = `<div class="feed-row"><span>Fetching live sources</span><strong>...</strong></div>`;
+    ui.liveEventList.innerHTML = `<li>Contacting USGS, NWS, and NOAA CO-OPS.</li>`;
+    return;
+  }
+
+  const sourceRows = liveData.sources
+    .map((source) => {
+      const state = source.status === "ok" ? "ok" : "error";
+      return `<div class="feed-row is-${state}">
+        <span>${escapeHtml(source.label)}</span>
+        <strong>${source.status === "ok" ? source.count : "!"}</strong>
+      </div>`;
+    })
+    .join("");
+
+  const plannedRows = plannedSources
+    .map((source) => `<div class="feed-row is-planned"><span>${escapeHtml(source)}</span><strong>next</strong></div>`)
+    .join("");
+
+  ui.feedStatus.innerHTML =
+    sourceRows ||
+    `<div class="feed-row is-error"><span>${escapeHtml(liveData.error ?? "No feeds loaded")}</span><strong>!</strong></div>`;
+  ui.feedStatus.insertAdjacentHTML("beforeend", plannedRows);
+
+  const events = liveData.events
+    .sort((a, b) => b.severity - a.severity)
+    .slice(0, 5)
+    .map((event) => `<li>
+      <b>${escapeHtml(event.title)}</b>
+      <span>${escapeHtml(event.source)} - ${escapeHtml(event.detail)}</span>
+    </li>`)
+    .join("");
+
+  ui.liveEventList.innerHTML = events || `<li>No live events returned yet.</li>`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function setScenario(key) {
@@ -244,6 +328,7 @@ function createEarthEngine(THREE, canvas) {
     flood: new THREE.Group(),
     pollution: new THREE.Group(),
     infrastructure: new THREE.Group(),
+    live: new THREE.Group(),
   };
 
   Object.values(layers).forEach((layer) => hazardRoot.add(layer));
@@ -278,7 +363,9 @@ function createEarthEngine(THREE, canvas) {
   }
 
   function rebuildHazards(scenario) {
-    Object.values(layers).forEach(clearGroup);
+    ["weather", "fire", "quake", "flood", "pollution", "infrastructure"].forEach((key) => {
+      clearGroup(layers[key]);
+    });
     const [lat, lon] = scenario.location;
 
     createWindField(THREE, layers.weather, lat, lon, scenario.accent);
@@ -291,7 +378,16 @@ function createEarthEngine(THREE, canvas) {
 
   function setLayerVisibility(visibility) {
     Object.entries(visibility).forEach(([key, value]) => {
-      layers[key].visible = value;
+      if (layers[key]) {
+        layers[key].visible = value;
+      }
+    });
+  }
+
+  function setLiveEvents(events) {
+    clearGroup(layers.live);
+    events.slice(0, 60).forEach((event) => {
+      createLiveEventMarker(THREE, layers.live, event);
     });
   }
 
@@ -328,13 +424,20 @@ function createEarthEngine(THREE, canvas) {
       }
     });
 
+    layers.live.children.forEach((item, index) => {
+      if (item.userData.isLiveMarker) {
+        const pulse = 1 + Math.sin(elapsed * 3 + index) * 0.18;
+        item.scale.setScalar(pulse);
+      }
+    });
+
     renderer.render(scene, camera);
   }
 
   window.addEventListener("resize", resize);
   resize();
 
-  return { animate, focusScenario, setLayerVisibility };
+  return { animate, focusScenario, setLayerVisibility, setLiveEvents };
 }
 
 function createGrid(THREE) {
@@ -522,6 +625,32 @@ function createInfrastructure(THREE, group, lat, lon) {
     ];
     group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(roadA), material));
     group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(roadB), material.clone()));
+  }
+}
+
+function createLiveEventMarker(THREE, group, event) {
+  const color = {
+    quake: 0xffd166,
+    weather: 0x54d8ff,
+    flood: 0x36b8ff,
+  }[event.kind] ?? 0xffffff;
+  const radius = 0.035 + event.severity * 0.08;
+  const marker = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 18, 18),
+    new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  marker.position.copy(latLonToVector3(event.lat, event.lon, 2.25));
+  marker.userData.baseScale = 1;
+  marker.userData.isLiveMarker = true;
+  group.add(marker);
+
+  if (event.kind === "quake") {
+    createSeismicRings(THREE, group, event.lat, event.lon, "#ffd166");
   }
 }
 

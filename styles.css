@@ -30,6 +30,10 @@ input {
   font: inherit;
 }
 
+button {
+  border: 0;
+}
+
 .app-shell {
   position: relative;
   min-height: 100vh;
@@ -123,6 +127,15 @@ h1 {
   padding: 18px;
 }
 
+.live-panel {
+  right: 28px;
+  bottom: 118px;
+  max-height: min(420px, calc(100vh - 250px));
+  min-height: 230px;
+  overflow: auto;
+  padding: 16px;
+}
+
 .panel-title {
   display: flex;
   align-items: baseline;
@@ -136,6 +149,19 @@ h1 {
 .panel-title strong {
   color: #f8fbff;
   font-size: 0.94rem;
+}
+
+.panel-title button {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(84, 216, 255, 0.12);
+  color: #bfefff;
+  cursor: pointer;
+}
+
+.panel-title button:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 .scenario-list {
@@ -293,6 +319,66 @@ h2 {
   white-space: normal;
 }
 
+.feed-status {
+  display: grid;
+  gap: 7px;
+}
+
+.feed-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  border-radius: 8px;
+  padding: 8px 9px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #c7dce9;
+  font-size: 0.78rem;
+}
+
+.feed-row strong {
+  color: var(--green);
+  font-size: 0.76rem;
+}
+
+.feed-row.is-error strong {
+  color: var(--red);
+}
+
+.feed-row.is-planned {
+  color: #91a5b5;
+}
+
+.feed-row.is-planned strong {
+  color: var(--yellow);
+}
+
+.live-events ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-events li {
+  display: grid;
+  gap: 3px;
+  border-left: 2px solid rgba(112, 240, 166, 0.65);
+  padding-left: 10px;
+  color: #caddeb;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.live-events b {
+  color: #ffffff;
+}
+
+.live-events span {
+  color: var(--muted);
+}
+
 .telemetry-strip {
   position: fixed;
   z-index: 5;
@@ -390,6 +476,18 @@ h2 {
     left: 16px;
     right: 16px;
     top: 870px;
+  }
+
+  .live-panel {
+    left: 16px;
+    right: 16px;
+    top: 1235px;
+    bottom: auto;
+    max-height: none;
+  }
+
+  .app-shell {
+    min-height: 1540px;
   }
 
   .telemetry-strip {

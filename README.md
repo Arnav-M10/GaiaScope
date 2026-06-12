@@ -8,6 +8,7 @@ The current build is a standalone web app that renders a procedural Three.js glo
 - wildfire ignition, heat, smoke transport, and spread logic
 - earthquake epicenter, seismic wavefronts, attenuation, and exposure
 - city heatwave intensity, air quality stress, and vulnerability
+- live USGS earthquake markers, NWS alert signals, and NOAA water-level telemetry
 
 ## Run
 
@@ -23,4 +24,15 @@ http://127.0.0.1:5173
 
 ## Notes
 
-This first prototype uses simulated fields and generated geometry. The next useful step is to replace each scenario's static seed data with live adapters for NOAA, NASA FIRMS, USGS, OpenAQ, NOAA Tides & Currents, Sentinel Hub, and OpenStreetMap.
+This prototype combines simulated physics fields with a first live-data pass:
+
+- USGS all-day earthquake GeoJSON feed
+- NWS active alerts for Florida, California, and Texas
+- NOAA CO-OPS latest water level for Key West station 8724580
+
+Still planned:
+
+- NASA FIRMS active fire detections, via a backend-proxied FIRMS MAP_KEY
+- OpenAQ pollution, via backend handling for API/auth/CORS stability
+- OpenStreetMap/Overpass infrastructure, with throttling and caching
+- Sentinel Hub imagery, with OAuth/client credentials
