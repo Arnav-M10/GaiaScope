@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GaiaScope | Real-Time Earth Risk Engine</title>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <canvas id="earth-canvas" aria-label="Interactive 3D Earth risk visualization"></canvas>
+
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">GaiaScope</p>
+          <h1>A real-time physics digital twin of Earth's danger zones.</h1>
+        </div>
+        <div class="status-pill">
+          <span class="pulse"></span>
+          Live physics sandbox
+        </div>
+      </header>
+
+      <aside class="panel scenario-panel" aria-label="Scenario controls">
+        <div class="panel-title">
+          <span>Scenario</span>
+          <strong id="scenarioRegion">Florida coast</strong>
+        </div>
+
+        <div class="scenario-list" id="scenarioList"></div>
+
+        <label class="range-row" for="timeHorizon">
+          <span>Forecast horizon</span>
+          <output id="horizonValue">6h</output>
+        </label>
+        <input id="timeHorizon" type="range" min="1" max="24" value="6" />
+
+        <div class="layer-grid" aria-label="Physics layers">
+          <label><input type="checkbox" data-layer="weather" checked /> Wind</label>
+          <label><input type="checkbox" data-layer="fire" checked /> Fire</label>
+          <label><input type="checkbox" data-layer="quake" checked /> Quake</label>
+          <label><input type="checkbox" data-layer="flood" checked /> Flood</label>
+          <label><input type="checkbox" data-layer="pollution" checked /> Smoke</label>
+          <label><input type="checkbox" data-layer="infrastructure" checked /> Assets</label>
+        </div>
+      </aside>
+
+      <aside class="panel intelligence-panel" aria-label="Risk intelligence">
+        <div class="score-block">
+          <span>Composite risk</span>
+          <strong id="riskScore">82</strong>
+        </div>
+        <div class="risk-meter">
+          <span id="riskMeter"></span>
+        </div>
+
+        <section>
+          <h2>Why this is dangerous</h2>
+          <ul id="explainList" class="explain-list"></ul>
+        </section>
+
+        <section>
+          <h2>Physics model</h2>
+          <div id="equationStack" class="equation-stack"></div>
+        </section>
+      </aside>
+
+      <section class="telemetry-strip" aria-label="Simulation telemetry">
+        <article>
+          <span>Wind</span>
+          <strong id="windTelemetry">64 kt</strong>
+        </article>
+        <article>
+          <span>Moisture</span>
+          <strong id="moistureTelemetry">82%</strong>
+        </article>
+        <article>
+          <span>Exposure</span>
+          <strong id="exposureTelemetry">1.8M</strong>
+        </article>
+        <article>
+          <span>Uncertainty</span>
+          <strong id="uncertaintyTelemetry">+/-14%</strong>
+        </article>
+      </section>
+
+      <div class="fallback" id="fallback" hidden>
+        <strong>3D engine unavailable</strong>
+        <span>GaiaScope needs WebGL and access to the Three.js module CDN for this prototype.</span>
+      </div>
+    </main>
+
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
