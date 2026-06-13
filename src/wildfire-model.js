@@ -28,9 +28,11 @@ export function buildWildfireModel(proxyPayload, scenario) {
   });
   const confidence = buildConfidence(proxyPayload, fires, weather);
   const risk = calculateWildfireRisk({ spread, smoke, wind, fuelDryness, slope, confidence });
+  const sourceMode = determineSourceMode(proxyPayload, confidence);
 
   return {
     updatedAt: proxyPayload?.updatedAt ?? new Date().toISOString(),
+    sourceMode,
     center: { lat: scenario.location[0], lon: scenario.location[1] },
     ignitions: fires,
     wind,
@@ -57,6 +59,19 @@ export function buildWildfireModel(proxyPayload, scenario) {
       cfl: clamp(wind.speedMph / 80 + 0.12, 0.18, 0.92),
       diffusion: clamp(0.012 + (1 - weather.humidityPct / 100) * 0.04, 0.012, 0.07),
       vorticity: clamp(Math.abs(Math.sin((wind.directionDeg * Math.PI) / 180)) * 0.55 + slope.alignment * 0.25, 0.08, 0.84),
+    },
+    audit: {
+      ignitionPoints: fires.length,
+      windSpeedMph: wind.speedMph,
+      windDirectionDeg: wind.directionDeg,
+      humidityPct: wind.humidityPct,
+      fuelDryness,
+      slopeGrade: slope.grade,
+      slopeAspectDeg: slope.aspectDeg,
+      spreadAreaKm2: spread.areaKm2,
+      headFireRateKmh: spread.headFireRateKmh,
+      smokeParticleCount: smoke.particles.length,
+      sourceSummary: summarizeSources(proxyPayload),
     },
   };
 }
@@ -196,11 +211,11 @@ function buildConfidence(payload, fires, weather) {
   const rows = [
     {
       label: "Ignition points",
-      status: payload?.firms?.status === "live" ? "live" : payload?.firms?.status === "missing_key" ? "missing" : "estimated",
+      status: payload?.firms?.status === "live" ? "live" : payload?.firms?.status === "missing_key" ? "fallback" : "estimated",
       detail:
         payload?.firms?.status === "live"
           ? `${fires.length} NASA FIRMS detections`
-          : "FIRMS MAP_KEY missing; using fallback ignition seeds",
+          : "FIRMS_MAP_KEY missing; using synthetic ignition seeds, so confidence is reduced",
     },
     {
       label: "Wind/humidity",
@@ -210,7 +225,7 @@ function buildConfidence(payload, fires, weather) {
     {
       label: "Terrain slope",
       status: "estimated",
-      detail: "Analytic Sierra foothill slope approximation",
+      detail: "Estimated from an analytic Sierra foothill aspect/grade approximation until DEM tiles are connected",
     },
     {
       label: "Fuel dryness",
@@ -219,19 +234,58 @@ function buildConfidence(payload, fires, weather) {
     },
     {
       label: "NWS fire context",
-      status: payload?.nws?.status === "live" ? "live" : "missing",
-      detail: payload?.nws?.status === "live" ? "NWS point/alert context loaded" : "NWS context unavailable",
+      status: payload?.nws?.status === "live" ? "live" : payload?.nws?.status === "error" ? "missing" : "estimated",
+      detail: payload?.nws?.status === "live" ? "NWS point/alert context loaded" : "NWS context unavailable; model stays in fallback mode",
     },
   ];
   const score =
     rows.reduce((sum, row) => {
       if (row.status === "live") return sum + 1;
       if (row.status === "estimated") return sum + 0.55;
+      if (row.status === "fallback") return sum + 0.32;
       if (row.status === "simulated") return sum + 0.35;
       return sum + 0.15;
     }, 0) / rows.length;
 
   return { rows, score: clamp(score, 0, 1) };
+}
+
+function determineSourceMode(payload, confidence) {
+  const statuses = [payload?.weather?.status, payload?.nws?.status, payload?.firms?.status];
+  if (statuses.every((status) => status === "error" || status === undefined)) {
+    return {
+      label: "Demo fallback mode",
+      detail: "All wildfire live inputs failed; using demo weather, synthetic ignitions, and estimated terrain.",
+    };
+  }
+  if (payload?.firms?.status === "missing_key") {
+    return {
+      label: "Live weather + synthetic FIRMS",
+      detail: "Weather/NWS may be live, but active fire detections are synthetic until FIRMS_MAP_KEY is set.",
+    };
+  }
+  if (confidence.score < 0.45) {
+    return {
+      label: "Low-confidence fallback",
+      detail: "Most inputs are estimated or missing; use the model only as a visual physics sandbox.",
+    };
+  }
+  return {
+    label: "Operational sandbox",
+    detail: "Live and estimated inputs are blended into the spread and smoke solver.",
+  };
+}
+
+function summarizeSources(payload) {
+  const weather = payload?.weather?.status === "live" ? "weather live" : "weather fallback";
+  const nws = payload?.nws?.status === "live" ? "NWS live" : "NWS fallback";
+  const firms =
+    payload?.firms?.status === "live"
+      ? "FIRMS live"
+      : payload?.firms?.status === "missing_key"
+        ? "FIRMS synthetic"
+        : "FIRMS fallback";
+  return `${weather}; ${nws}; ${firms}`;
 }
 
 function calculateWildfireRisk({ spread, smoke, wind, fuelDryness, slope, confidence }) {

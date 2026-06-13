@@ -466,6 +466,11 @@ h2 {
   color: var(--yellow);
 }
 
+.confidence-badge.is-fallback {
+  background: rgba(255, 138, 61, 0.14);
+  color: var(--orange);
+}
+
 .confidence-badge.is-simulated {
   background: rgba(84, 216, 255, 0.13);
   color: var(--blue);
@@ -492,6 +497,37 @@ h2 {
   width: var(--value);
   border-radius: inherit;
   background: linear-gradient(90deg, var(--blue), var(--green), var(--yellow));
+}
+
+.model-audit {
+  margin-top: 14px;
+}
+
+.audit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.audit-item {
+  display: grid;
+  gap: 3px;
+  border-radius: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.audit-item span {
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.audit-item strong {
+  color: #f8fbff;
+  font-size: 0.83rem;
 }
 
 .explain-list,

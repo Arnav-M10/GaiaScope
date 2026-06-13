@@ -183,6 +183,7 @@ const ui = {
   confidenceScore: document.querySelector("#confidenceScore"),
   confidenceSummary: document.querySelector("#confidenceSummary"),
   confidenceRows: document.querySelector("#confidenceRows"),
+  wildfireAudit: document.querySelector("#wildfireAudit"),
 };
 
 let activeScenario = "hurricane";
@@ -316,8 +317,12 @@ async function refreshWildfireModel() {
     wildfireModel.confidence.rows.unshift({
       label: "Proxy server",
       status: "missing",
-      detail: `Run node server.mjs for live wildfire inputs (${error.message}).`,
+      detail: `Wildfire proxy unavailable. If you are running python -m http.server, switch to node server.mjs. (${error.message})`,
     });
+    wildfireModel.sourceMode = {
+      label: "Demo fallback mode",
+      detail: "The browser could not reach /api/wildfire, so weather, FIRMS, and NWS inputs are demo fallbacks.",
+    };
     wildfireModel.confidence.score = Math.max(0.22, wildfireModel.confidence.score - 0.18);
   } finally {
     wildfireLoading = false;
@@ -465,6 +470,7 @@ function renderConfidencePanel() {
     ui.confidenceScore.textContent = "Loading";
     ui.confidenceSummary.textContent = "Fetching wildfire proxy inputs and rebuilding spread/smoke model.";
     ui.confidenceRows.innerHTML = `<div class="confidence-row"><span><b>Assimilation</b><small>Contacting local proxy for FIRMS, NWS, and Open-Meteo.</small></span><strong class="confidence-badge is-simulated">running</strong></div>`;
+    ui.wildfireAudit.innerHTML = "";
     return;
   }
 
@@ -472,6 +478,7 @@ function renderConfidencePanel() {
     ui.confidenceScore.textContent = "--";
     ui.confidenceSummary.textContent = "Select Wildfire to inspect live, estimated, simulated, and missing inputs.";
     ui.confidenceRows.innerHTML = "";
+    ui.wildfireAudit.innerHTML = "";
     return;
   }
 
@@ -479,7 +486,7 @@ function renderConfidencePanel() {
   ui.confidenceScore.textContent = `${score}%`;
   ui.confidenceSummary.textContent =
     activeScenario === "wildfire"
-      ? `${wildfireModel.risk.label}. Spread area ${wildfireModel.spread.areaKm2.toFixed(1)} km2, head-fire rate ${wildfireModel.spread.headFireRateKmh.toFixed(1)} km/h.`
+      ? `${wildfireModel.sourceMode.label}: ${wildfireModel.sourceMode.detail}`
       : "Wildfire model is ready in the background; select Wildfire to inspect operational inputs.";
   ui.confidenceRows.innerHTML = wildfireModel.confidence.rows
     .map(
@@ -489,14 +496,41 @@ function renderConfidencePanel() {
       </div>`,
     )
     .join("");
+  ui.wildfireAudit.innerHTML = renderWildfireAudit(wildfireModel);
 }
 
 function wildfireExplanations(model) {
   return [
-    `Head-fire spread is ${model.spread.headFireRateKmh.toFixed(1)} km/h because ${Math.round(model.fuelDryness * 100)}% fuel dryness combines with ${Math.round(model.wind.speedMph)} mph wind.`,
-    `Wind from ${Math.round(model.wind.directionDeg)} degrees projects the plume downwind while diffusion grows under ${Math.round(model.wind.humidityPct)}% relative humidity.`,
-    `Terrain slope alignment contributes ${Math.round(model.slope.alignment * 100)}% of the slope boost; this is estimated until real DEM data is connected.`,
+    `Wind-driven head-fire spread is ${model.spread.headFireRateKmh.toFixed(1)} km/h: the solver elongates the fire ellipse in the downwind direction using ${Math.round(model.wind.speedMph)} mph wind and ${Math.round(model.fuelDryness * 100)}% estimated fuel dryness.`,
+    `Crosswind smoke diffusion is modeled separately from downwind advection; lower humidity increases turbulent widening, so the plume spreads laterally while still drifting toward ${Math.round(model.wind.directionDeg)} degrees.`,
+    `Terrain slope is currently estimated from a regional Sierra foothill grade/aspect approximation. Real DEM tiles are not connected yet, so slope boosts confidence less than live weather or FIRMS detections.`,
+    model.sourceMode.label.includes("synthetic") || model.sourceMode.label.includes("fallback")
+      ? "Because FIRMS_MAP_KEY is missing or the proxy is unavailable, ignition points are synthetic fallback seeds; confidence is intentionally reduced and the UI labels this as fallback/demo mode."
+      : "FIRMS detections are live, so ignition placement contributes strongly to confidence while fuel dryness and slope remain estimated.",
   ];
+}
+
+function renderWildfireAudit(model) {
+  const audit = model.audit;
+  const rows = [
+    ["Ignitions", audit.ignitionPoints],
+    ["Wind", `${audit.windSpeedMph.toFixed(1)} mph @ ${Math.round(audit.windDirectionDeg)} deg`],
+    ["Humidity", `${Math.round(audit.humidityPct)}% RH`],
+    ["Fuel dryness", `${Math.round(audit.fuelDryness * 100)}%`],
+    ["Slope", `${Math.round(audit.slopeGrade * 100)}% @ ${Math.round(audit.slopeAspectDeg)} deg`],
+    ["Spread area", `${audit.spreadAreaKm2.toFixed(1)} km2`],
+    ["Head-fire", `${audit.headFireRateKmh.toFixed(1)} km/h`],
+    ["Smoke particles", audit.smokeParticleCount],
+    ["Inputs", audit.sourceSummary],
+  ];
+  return rows
+    .map(
+      ([label, value]) => `<div class="audit-item">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value)}</strong>
+      </div>`,
+    )
+    .join("");
 }
 
 function wildfireTimeline(model) {
@@ -863,9 +897,9 @@ function createOperationalFireField(THREE, group, model) {
     depthWrite: false,
   });
   const perimeterMaterial = new THREE.MeshBasicMaterial({
-    color: 0xffd166,
+    color: 0xfff2a8,
     transparent: true,
-    opacity: 0.78,
+    opacity: 0.94,
     blending: THREE.AdditiveBlending,
   });
 
@@ -880,13 +914,30 @@ function createOperationalFireField(THREE, group, model) {
   });
 
   model.spread.perimeter.slice(0, 90).forEach((cell) => {
-    const point = new THREE.Mesh(new THREE.SphereGeometry(0.012 + cell.intensity * 0.028, 12, 12), perimeterMaterial);
+    const point = new THREE.Mesh(new THREE.SphereGeometry(0.018 + cell.intensity * 0.035, 12, 12), perimeterMaterial);
     point.position.copy(latLonToVector3(cell.lat, cell.lon, 2.2));
     point.userData.baseScale = 1;
     group.add(point);
   });
 
   model.ignitions.forEach((ignition) => {
+    const normal = latLonToVector3(ignition.lat, ignition.lon, 1).normalize();
+    const halo = new THREE.Mesh(
+      new THREE.RingGeometry(0.055, 0.082, 42),
+      new THREE.MeshBasicMaterial({
+        color: ignition.live ? 0xfff2a8 : 0xff8a3d,
+        transparent: true,
+        opacity: ignition.live ? 0.72 : 0.42,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      }),
+    );
+    halo.position.copy(latLonToVector3(ignition.lat, ignition.lon, 2.235));
+    halo.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+    halo.userData.baseScale = 1.1;
+    group.add(halo);
+
     const marker = new THREE.Mesh(
       new THREE.SphereGeometry(0.04 + ignition.intensity * 0.05, 18, 18),
       new THREE.MeshBasicMaterial({
@@ -959,13 +1010,26 @@ function createSmokePlume(THREE, group, lat, lon) {
 }
 
 function createOperationalSmokePlume(THREE, group, model) {
+  const plumeLineMaterial = new THREE.LineBasicMaterial({
+    color: 0xd4dad6,
+    transparent: true,
+    opacity: 0.22,
+  });
+  const axisPoints = model.smoke.particles
+    .filter((_, index) => index % 12 === 0)
+    .slice(0, 18)
+    .map((particle) => latLonToVector3(particle.lat, particle.lon, 2.245));
+  if (axisPoints.length > 2) {
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(axisPoints), plumeLineMaterial));
+  }
+
   model.smoke.particles.slice(0, 120).forEach((particle) => {
     const puff = new THREE.Mesh(
-      new THREE.SphereGeometry(0.03 + particle.concentration * 0.05, 16, 16),
+      new THREE.SphereGeometry(0.035 + particle.concentration * 0.06, 16, 16),
       new THREE.MeshBasicMaterial({
         color: 0xc7d0cb,
         transparent: true,
-        opacity: 0.08 + particle.concentration * 0.16,
+        opacity: 0.1 + particle.concentration * 0.2,
         blending: THREE.AdditiveBlending,
       }),
     );
@@ -1261,21 +1325,37 @@ function createPhysicsField(canvas) {
     for (let i = 0; i < current.length; i += 1) {
       const value = current[i];
       const p = i * 4;
-      image.data[p] = Math.round(20 + value * 245);
-      image.data[p + 1] = Math.round(80 + Math.sin(value * Math.PI) * 160);
-      image.data[p + 2] = Math.round(120 + (1 - value) * 120);
+      if (wildfire) {
+        image.data[p] = Math.round(34 + value * 221);
+        image.data[p + 1] = Math.round(44 + Math.sin(value * Math.PI) * 128 + value * 54);
+        image.data[p + 2] = Math.round(58 + (1 - value) * 126);
+      } else {
+        image.data[p] = Math.round(20 + value * 245);
+        image.data[p + 1] = Math.round(80 + Math.sin(value * Math.PI) * 160);
+        image.data[p + 2] = Math.round(120 + (1 - value) * 120);
+      }
       image.data[p + 3] = 255;
     }
     offscreenContext.putImageData(image, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "rgba(166,243,255,0.35)";
+    ctx.strokeStyle = wildfire ? "rgba(255,216,145,0.42)" : "rgba(166,243,255,0.35)";
     ctx.lineWidth = 1;
     for (let x = 0; x < canvas.width; x += 32) {
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x + Math.sin((tick + x) * 0.02) * 16, canvas.height);
       ctx.stroke();
+    }
+    if (wildfire) {
+      ctx.fillStyle = "rgba(255, 245, 210, 0.88)";
+      wildfire.ignitions.slice(0, 5).forEach((ignition) => {
+        const x = canvas.width * (0.38 + (ignition.lon - wildfire.center.lon) * 2.2);
+        const y = canvas.height * (0.5 - (ignition.lat - wildfire.center.lat) * 2.2);
+        ctx.beginPath();
+        ctx.arc(x, y, 4 + ignition.intensity * 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
     }
   }
 
