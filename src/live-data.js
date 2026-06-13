@@ -40,11 +40,27 @@ const SOURCE_CONFIG = [
 ];
 
 export const plannedSources = [
-  "NASA FIRMS active fires: needs a FIRMS MAP_KEY, best proxied by a backend.",
-  "OpenAQ pollution: API access and CORS behavior should be handled server-side.",
+  "NASA FIRMS active fires: proxied locally when FIRMS_MAP_KEY is set.",
+  "Open-Meteo wind/humidity: proxied locally for wildfire spread inputs.",
+  "NWS point forecast/alerts: proxied locally for wildfire weather context.",
   "OpenStreetMap infrastructure: Overpass queries need throttling and caching.",
   "Sentinel Hub imagery: requires OAuth/client credentials.",
 ];
+
+export async function fetchWildfireInputs({ lat, lon, bbox }) {
+  const url = new URL("/api/wildfire", window.location.origin);
+  url.searchParams.set("lat", lat);
+  url.searchParams.set("lon", lon);
+  if (bbox) {
+    url.searchParams.set("bbox", bbox);
+  }
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+  return response.json();
+}
 
 export async function fetchLiveData() {
   const settled = await Promise.allSettled(SOURCE_CONFIG.map(fetchSource));

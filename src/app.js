@@ -1,4 +1,5 @@
-import { fetchLiveData, plannedSources } from "./live-data.js";
+import { fetchLiveData, fetchWildfireInputs, plannedSources } from "./live-data.js";
+import { buildWildfireModel, defaultWildfireModel } from "./wildfire-model.js";
 
 const scenarios = {
   hurricane: {
@@ -45,6 +46,9 @@ const scenarios = {
     factors: { forcing: 0.74, exposure: 0.58, vulnerability: 0.71, confidence: 0.64 },
     diagnostics: { residual: 0.24, cfl: 0.57, diffusion: 0.026, vorticity: 0.52 },
     field: { source: 0.95, advectionX: 0.78, advectionY: 0.22, diffusion: 0.04, swirl: 0.35 },
+    wildfire: {
+      bbox: "-124.8,32.2,-114.0,42.2",
+    },
     timeline: [
       ["0-1h", 0.55, "ignition growth"],
       ["2-4h", 0.82, "wind run"],
@@ -176,11 +180,16 @@ const ui = {
   refreshFeeds: document.querySelector("#refreshFeeds"),
   lastUpdated: document.querySelector("#lastUpdated"),
   fieldCanvas: document.querySelector("#field-canvas"),
+  confidenceScore: document.querySelector("#confidenceScore"),
+  confidenceSummary: document.querySelector("#confidenceSummary"),
+  confidenceRows: document.querySelector("#confidenceRows"),
 };
 
 let activeScenario = "hurricane";
 let currentView = "cinematic";
 let livePressure = 0;
+let wildfireModel;
+let wildfireLoading = false;
 let engine;
 let fieldModel;
 let THREE_NS;
@@ -254,6 +263,7 @@ async function boot() {
     setScenario(activeScenario);
     engine.animate();
     refreshLiveFeeds();
+    refreshWildfireModel();
   } catch (error) {
     console.error(error);
     ui.fallback.hidden = false;
@@ -286,6 +296,38 @@ async function refreshLiveFeeds() {
   } finally {
     ui.refreshFeeds.disabled = false;
     ui.refreshFeeds.textContent = "Refresh";
+  }
+}
+
+async function refreshWildfireModel() {
+  const scenario = scenarios.wildfire;
+  wildfireLoading = true;
+  renderConfidencePanel();
+
+  try {
+    const payload = await fetchWildfireInputs({
+      lat: scenario.location[0],
+      lon: scenario.location[1],
+      bbox: scenario.wildfire.bbox,
+    });
+    wildfireModel = buildWildfireModel(payload, scenario);
+  } catch (error) {
+    wildfireModel = defaultWildfireModel(scenario);
+    wildfireModel.confidence.rows.unshift({
+      label: "Proxy server",
+      status: "missing",
+      detail: `Run node server.mjs for live wildfire inputs (${error.message}).`,
+    });
+    wildfireModel.confidence.score = Math.max(0.22, wildfireModel.confidence.score - 0.18);
+  } finally {
+    wildfireLoading = false;
+    if (activeScenario === "wildfire") {
+      fieldModel?.setWildfireModel(wildfireModel);
+      engine?.setWildfireModel(wildfireModel);
+      engine?.focusScenario(scenarios.wildfire, enabledLayers);
+    }
+    renderScenario();
+    renderConfidencePanel();
   }
 }
 
@@ -335,18 +377,30 @@ function renderFeedStatus(liveData) {
 function setScenario(key) {
   activeScenario = key;
   renderScenario();
+  if (key === "wildfire" && !wildfireModel && !wildfireLoading) {
+    refreshWildfireModel();
+  }
+  if (key === "wildfire" && wildfireModel) {
+    engine?.setWildfireModel(wildfireModel);
+  }
   engine?.focusScenario(scenarios[key], enabledLayers);
-  fieldModel?.setScenario(scenarios[key]);
+  if (key === "wildfire" && wildfireModel) {
+    fieldModel?.setWildfireModel(wildfireModel);
+  } else {
+    fieldModel?.setScenario(scenarios[key]);
+  }
 }
 
 function renderScenario() {
   const scenario = scenarios[activeScenario];
+  const operationalWildfire = activeScenario === "wildfire" ? wildfireModel : null;
   const horizonFactor = Number(ui.horizon.value) / 24;
   const blendFactor = Number(ui.blend.value) / 100;
   const viewBoost = currentView === "physics" ? 2 : currentView === "response" ? -1 : 0;
+  const baseScore = operationalWildfire ? Math.round(operationalWildfire.risk.score * 100) : scenario.score;
   const score = Math.min(
     99,
-    Math.round(scenario.score + horizonFactor * 8 + livePressure * blendFactor * 11 + viewBoost),
+    Math.round(baseScore + horizonFactor * 8 + livePressure * blendFactor * 8 + viewBoost),
   );
 
   ui.scenarioRegion.textContent = scenario.region;
@@ -357,20 +411,24 @@ function renderScenario() {
   ui.ensembleCount.textContent = `${Math.round(24 + Number(ui.horizon.value) * 4)} runs`;
   ui.solverMode.textContent = currentView === "physics" ? "PDE focus" : "Hybrid PDE";
 
+  const telemetry = operationalWildfire?.telemetry ?? scenario.telemetry;
   scenario.telemetryLabels.forEach((label, index) => {
     ui.telemetryLabels[index].textContent = label;
   });
-  scenario.telemetry.forEach((value, index) => {
+  telemetry.forEach((value, index) => {
     ui.telemetry[index].textContent = value;
   });
 
-  const factors = adjustedFactors(scenario, horizonFactor, blendFactor);
+  const factors = operationalWildfire?.factors ?? adjustedFactors(scenario, horizonFactor, blendFactor);
   ui.factorGrid.innerHTML = Object.entries(factors)
     .map(([key, value]) => factorRow(key, value))
     .join("");
 
+  const explanations = operationalWildfire
+    ? wildfireExplanations(operationalWildfire)
+    : scenario.explanations;
   ui.explainList.replaceChildren(
-    ...scenario.explanations.map((text) => {
+    ...explanations.map((text) => {
       const item = document.createElement("li");
       item.textContent = text;
       return item;
@@ -385,18 +443,68 @@ function renderScenario() {
     }),
   );
 
-  ui.impactTimeline.innerHTML = scenario.timeline
+  const timeline = operationalWildfire ? wildfireTimeline(operationalWildfire) : scenario.timeline;
+  ui.impactTimeline.innerHTML = timeline
     .map(([time, value, label]) => timelineRow(time, value + horizonFactor * 0.08, label))
     .join("");
 
-  ui.modelResidual.textContent = `Residual ${scenario.diagnostics.residual.toFixed(2)}`;
-  ui.cflValue.textContent = scenario.diagnostics.cfl.toFixed(2);
-  ui.diffusionValue.textContent = scenario.diagnostics.diffusion.toFixed(3);
-  ui.vorticityValue.textContent = scenario.diagnostics.vorticity.toFixed(2);
+  const diagnostics = operationalWildfire?.diagnostics ?? scenario.diagnostics;
+  ui.modelResidual.textContent = `Residual ${diagnostics.residual.toFixed(2)}`;
+  ui.cflValue.textContent = diagnostics.cfl.toFixed(2);
+  ui.diffusionValue.textContent = diagnostics.diffusion.toFixed(3);
+  ui.vorticityValue.textContent = diagnostics.vorticity.toFixed(2);
 
   document.querySelectorAll(".scenario-button").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.scenario === activeScenario);
   });
+  renderConfidencePanel();
+}
+
+function renderConfidencePanel() {
+  if (wildfireLoading) {
+    ui.confidenceScore.textContent = "Loading";
+    ui.confidenceSummary.textContent = "Fetching wildfire proxy inputs and rebuilding spread/smoke model.";
+    ui.confidenceRows.innerHTML = `<div class="confidence-row"><span><b>Assimilation</b><small>Contacting local proxy for FIRMS, NWS, and Open-Meteo.</small></span><strong class="confidence-badge is-simulated">running</strong></div>`;
+    return;
+  }
+
+  if (!wildfireModel) {
+    ui.confidenceScore.textContent = "--";
+    ui.confidenceSummary.textContent = "Select Wildfire to inspect live, estimated, simulated, and missing inputs.";
+    ui.confidenceRows.innerHTML = "";
+    return;
+  }
+
+  const score = Math.round(wildfireModel.confidence.score * 100);
+  ui.confidenceScore.textContent = `${score}%`;
+  ui.confidenceSummary.textContent =
+    activeScenario === "wildfire"
+      ? `${wildfireModel.risk.label}. Spread area ${wildfireModel.spread.areaKm2.toFixed(1)} km2, head-fire rate ${wildfireModel.spread.headFireRateKmh.toFixed(1)} km/h.`
+      : "Wildfire model is ready in the background; select Wildfire to inspect operational inputs.";
+  ui.confidenceRows.innerHTML = wildfireModel.confidence.rows
+    .map(
+      (row) => `<div class="confidence-row">
+        <span><b>${escapeHtml(row.label)}</b><small>${escapeHtml(row.detail)}</small></span>
+        <strong class="confidence-badge is-${escapeHtml(row.status)}">${escapeHtml(row.status)}</strong>
+      </div>`,
+    )
+    .join("");
+}
+
+function wildfireExplanations(model) {
+  return [
+    `Head-fire spread is ${model.spread.headFireRateKmh.toFixed(1)} km/h because ${Math.round(model.fuelDryness * 100)}% fuel dryness combines with ${Math.round(model.wind.speedMph)} mph wind.`,
+    `Wind from ${Math.round(model.wind.directionDeg)} degrees projects the plume downwind while diffusion grows under ${Math.round(model.wind.humidityPct)}% relative humidity.`,
+    `Terrain slope alignment contributes ${Math.round(model.slope.alignment * 100)}% of the slope boost; this is estimated until real DEM data is connected.`,
+  ];
+}
+
+function wildfireTimeline(model) {
+  return [
+    ["0-1h", clamp(model.risk.score * 0.62, 0, 1), "surface run"],
+    ["2-4h", clamp(model.risk.score * 0.92, 0, 1), "head fire"],
+    ["5-8h", clamp(model.smoke.diffusion + model.risk.score * 0.45, 0, 1), "smoke impact"],
+  ];
 }
 
 function adjustedFactors(scenario, horizonFactor, blendFactor) {
@@ -530,6 +638,7 @@ function createEarthEngine(THREE, canvas) {
   let autoRotate = true;
   let speed = 1.2;
   let viewMode = "cinematic";
+  let activeWildfireModel = null;
   const clock = new THREE.Clock();
 
   function resize() {
@@ -554,10 +663,15 @@ function createEarthEngine(THREE, canvas) {
     });
     const [lat, lon] = scenario.location;
     createWindField(THREE, layers.weather, lat, lon, scenario.accent, scenario.field.swirl);
-    createFireField(THREE, layers.fire, lat, lon, scenario.accent);
+    if (scenario.label === "Wildfire" && activeWildfireModel) {
+      createOperationalFireField(THREE, layers.fire, activeWildfireModel);
+      createOperationalSmokePlume(THREE, layers.pollution, activeWildfireModel);
+    } else {
+      createFireField(THREE, layers.fire, lat, lon, scenario.accent);
+      createSmokePlume(THREE, layers.pollution, lat, lon);
+    }
     createSeismicRings(THREE, layers.quake, lat, lon, scenario.accent);
     createFloodField(THREE, layers.flood, lat, lon);
-    createSmokePlume(THREE, layers.pollution, lat, lon);
     createInfrastructure(THREE, layers.infrastructure, lat, lon, scenario.accent);
     createRiskCone(THREE, layers.weather, lat, lon, scenario.accent);
   }
@@ -591,6 +705,10 @@ function createEarthEngine(THREE, canvas) {
 
   function setSpeed(value) {
     speed = value;
+  }
+
+  function setWildfireModel(model) {
+    activeWildfireModel = model;
   }
 
   function animate() {
@@ -652,6 +770,7 @@ function createEarthEngine(THREE, canvas) {
     setViewMode,
     setAutoRotate,
     setSpeed,
+    setWildfireModel,
   };
 }
 
@@ -734,6 +853,55 @@ function createFireField(THREE, group, lat, lon, accent) {
   }
 }
 
+function createOperationalFireField(THREE, group, model) {
+  const heatMaterial = new THREE.MeshBasicMaterial({
+    color: 0xff6a2e,
+    transparent: true,
+    opacity: 0.42,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const perimeterMaterial = new THREE.MeshBasicMaterial({
+    color: 0xffd166,
+    transparent: true,
+    opacity: 0.78,
+    blending: THREE.AdditiveBlending,
+  });
+
+  model.spread.cells.slice(0, 240).forEach((cell) => {
+    const patch = new THREE.Mesh(new THREE.CircleGeometry(0.015 + cell.intensity * 0.045, 18), heatMaterial.clone());
+    const normal = latLonToVector3(cell.lat, cell.lon, 1).normalize();
+    patch.position.copy(latLonToVector3(cell.lat, cell.lon, 2.155));
+    patch.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+    patch.material.opacity = 0.12 + cell.intensity * 0.46;
+    patch.userData.baseScale = 0.85 + cell.intensity * 1.2;
+    group.add(patch);
+  });
+
+  model.spread.perimeter.slice(0, 90).forEach((cell) => {
+    const point = new THREE.Mesh(new THREE.SphereGeometry(0.012 + cell.intensity * 0.028, 12, 12), perimeterMaterial);
+    point.position.copy(latLonToVector3(cell.lat, cell.lon, 2.2));
+    point.userData.baseScale = 1;
+    group.add(point);
+  });
+
+  model.ignitions.forEach((ignition) => {
+    const marker = new THREE.Mesh(
+      new THREE.SphereGeometry(0.04 + ignition.intensity * 0.05, 18, 18),
+      new THREE.MeshBasicMaterial({
+        color: ignition.live ? 0xfff2a8 : 0xff8a3d,
+        transparent: true,
+        opacity: 0.92,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    marker.position.copy(latLonToVector3(ignition.lat, ignition.lon, 2.24));
+    marker.userData.baseScale = 1.2;
+    group.add(marker);
+  });
+}
+
 function createSeismicRings(THREE, group, lat, lon, accent) {
   const normal = latLonToVector3(lat, lon, 1).normalize();
   const origin = latLonToVector3(lat, lon, 2.18);
@@ -788,6 +956,31 @@ function createSmokePlume(THREE, group, lat, lon) {
     puff.userData.drift = latLonToVector3(lat + 1.4, lon - 2.8, 1).normalize().multiplyScalar(0.9);
     group.add(puff);
   }
+}
+
+function createOperationalSmokePlume(THREE, group, model) {
+  model.smoke.particles.slice(0, 120).forEach((particle) => {
+    const puff = new THREE.Mesh(
+      new THREE.SphereGeometry(0.03 + particle.concentration * 0.05, 16, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0xc7d0cb,
+        transparent: true,
+        opacity: 0.08 + particle.concentration * 0.16,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    const origin = latLonToVector3(particle.lat, particle.lon, 2.2 + particle.concentration * 0.04);
+    puff.position.copy(origin);
+    puff.userData.origin = origin.clone();
+    puff.userData.drift = latLonToVector3(
+      particle.lat + Math.cos((model.wind.directionDeg * Math.PI) / 180),
+      particle.lon + Math.sin((model.wind.directionDeg * Math.PI) / 180),
+      1,
+    )
+      .normalize()
+      .multiplyScalar(0.55 + model.wind.speedMph / 80);
+    group.add(puff);
+  });
 }
 
 function createInfrastructure(THREE, group, lat, lon, accent) {
@@ -978,6 +1171,7 @@ function createPhysicsField(canvas) {
   let current = new Float32Array(width * height);
   let next = new Float32Array(width * height);
   let scenario = scenarios.hurricane;
+  let wildfire = null;
   let tick = 0;
   const offscreen = document.createElement("canvas");
   offscreen.width = width;
@@ -986,27 +1180,68 @@ function createPhysicsField(canvas) {
 
   function setScenario(nextScenario) {
     scenario = nextScenario;
+    wildfire = null;
+    current.fill(0);
+    seed();
+  }
+
+  function setWildfireModel(model) {
+    scenario = scenarios.wildfire;
+    wildfire = model;
     current.fill(0);
     seed();
   }
 
   function seed() {
-    const cx = Math.floor(width * 0.38);
-    const cy = Math.floor(height * 0.5);
-    for (let y = -6; y <= 6; y += 1) {
-      for (let x = -6; x <= 6; x += 1) {
-        const dist = Math.sqrt(x * x + y * y);
-        if (dist < 6) current[(cy + y) * width + cx + x] = scenario.field.source * (1 - dist / 7);
+    const seeds = wildfire
+      ? wildfire.ignitions.map((ignition) => {
+          const dx = (ignition.lon - wildfire.center.lon) * 2.2;
+          const dy = (ignition.lat - wildfire.center.lat) * -2.2;
+          return {
+            x: Math.floor(width * (0.38 + dx)),
+            y: Math.floor(height * (0.5 + dy)),
+            source: ignition.intensity,
+          };
+        })
+      : [{ x: Math.floor(width * 0.38), y: Math.floor(height * 0.5), source: scenario.field.source }];
+
+    seeds.forEach((seedPoint) => {
+      for (let y = -6; y <= 6; y += 1) {
+        for (let x = -6; x <= 6; x += 1) {
+          const px = clamp(seedPoint.x + x, 1, width - 2);
+          const py = clamp(seedPoint.y + y, 1, height - 2);
+          const dist = Math.sqrt(x * x + y * y);
+          if (dist < 6) current[py * width + px] = seedPoint.source * (1 - dist / 7);
+        }
       }
-    }
+    });
   }
 
   function step() {
     tick += 1;
-    const params = scenario.field;
-    const sx = Math.floor(width * (0.28 + Math.sin(tick * 0.025) * 0.04));
-    const sy = Math.floor(height * (0.5 + Math.cos(tick * 0.018) * 0.09));
-    current[sy * width + sx] = Math.min(1, current[sy * width + sx] + params.source * 0.18);
+    const params = wildfire
+      ? {
+          source: Math.max(0.35, wildfire.fuelDryness),
+          advectionX: Math.sin((wildfire.wind.directionDeg * Math.PI) / 180) * (0.4 + wildfire.wind.speedMph / 38),
+          advectionY: -Math.cos((wildfire.wind.directionDeg * Math.PI) / 180) * (0.4 + wildfire.wind.speedMph / 38),
+          diffusion: wildfire.smoke.diffusion * 0.11,
+          swirl: wildfire.slope.alignment * 0.35,
+        }
+      : scenario.field;
+
+    if (wildfire) {
+      wildfire.ignitions.slice(0, 5).forEach((ignition, index) => {
+        const sx = Math.floor(width * (0.38 + (ignition.lon - wildfire.center.lon) * 2.2));
+        const sy = Math.floor(height * (0.5 - (ignition.lat - wildfire.center.lat) * 2.2));
+        const safeX = clamp(sx, 1, width - 2);
+        const safeY = clamp(sy, 1, height - 2);
+        current[safeY * width + safeX] = Math.min(1, current[safeY * width + safeX] + ignition.intensity * 0.11 + index * 0.005);
+      });
+    } else {
+      const sx = Math.floor(width * (0.28 + Math.sin(tick * 0.025) * 0.04));
+      const sy = Math.floor(height * (0.5 + Math.cos(tick * 0.018) * 0.09));
+      current[sy * width + sx] = Math.min(1, current[sy * width + sx] + params.source * 0.18);
+    }
 
     for (let y = 1; y < height - 1; y += 1) {
       for (let x = 1; x < width - 1; x += 1) {
@@ -1055,7 +1290,7 @@ function createPhysicsField(canvas) {
     loop();
   }
 
-  return { start, setScenario };
+  return { start, setScenario, setWildfireModel };
 }
 
 function rotationForLatLon(lat, lon) {
