@@ -7,8 +7,11 @@ The project is designed as a portfolio-grade research prototype: visually dramat
 ## Features
 
 - Cinematic Three.js Earth with generated land, atmosphere, clouds, stars, city lights, live markers, hazard cones, and animated disaster overlays.
+- Premium Earth stack with external satellite/cloud/bump/night-light texture loading and an intentional fallback Earth if textures fail.
+- Toggleable global layers for satellite view, night lights, clouds, atmosphere, lat/lon grid, coastlines, terrain mode, and bathymetry mode.
 - Scenario modes for hurricane, wildfire, earthquake, and heatwave.
 - Command-center UI with Cinematic, Physics, and Response views.
+- Compact professional layer groups for weather intelligence, wildfire intelligence, infrastructure placeholders, and global overlays.
 - Live-data assimilation blend that changes risk scores.
 - USGS earthquake feed, NWS alerts, NOAA CO-OPS water level telemetry.
 - Local wildfire proxy for Open-Meteo wind/humidity, NWS context, and NASA FIRMS detections when `FIRMS_MAP_KEY` is available.

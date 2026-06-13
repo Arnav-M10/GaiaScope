@@ -137,6 +137,17 @@ const enabledLayers = {
   live: true,
 };
 
+const earthLayers = {
+  satellite: true,
+  night: true,
+  clouds: true,
+  atmosphere: true,
+  grid: true,
+  coastlines: true,
+  terrain: false,
+  bathymetry: false,
+};
+
 const ui = {
   canvas: document.querySelector("#earth-canvas"),
   fallback: document.querySelector("#fallback"),
@@ -189,6 +200,9 @@ const ui = {
   wildfireAudit: document.querySelector("#wildfireAudit"),
   windCompassArrow: document.querySelector("#windCompassArrow"),
   windCompassSpeed: document.querySelector("#windCompassSpeed"),
+  earthTextureStatus: document.querySelector("#earthTextureStatus"),
+  overlayOpacity: document.querySelector("#overlayOpacity"),
+  overlayOpacityValue: document.querySelector("#overlayOpacityValue"),
 };
 
 let activeScenario = "hurricane";
@@ -218,6 +232,13 @@ document.querySelectorAll("[data-layer]").forEach((checkbox) => {
   });
 });
 
+document.querySelectorAll("[data-earth-layer]").forEach((checkbox) => {
+  checkbox.addEventListener("change", (event) => {
+    earthLayers[event.target.dataset.earthLayer] = event.target.checked;
+    engine?.setEarthLayers(earthLayers);
+  });
+});
+
 document.querySelectorAll("[data-view]").forEach((button) => {
   button.addEventListener("click", () => {
     currentView = button.dataset.view;
@@ -243,6 +264,12 @@ ui.blend.addEventListener("input", () => {
 ui.speed.addEventListener("input", () => {
   ui.speedValue.textContent = `${(Number(ui.speed.value) / 10).toFixed(1)}x`;
   engine?.setSpeed(Number(ui.speed.value) / 10);
+});
+
+ui.overlayOpacity.addEventListener("input", () => {
+  const opacity = Number(ui.overlayOpacity.value) / 100;
+  ui.overlayOpacityValue.textContent = `${ui.overlayOpacity.value}%`;
+  engine?.setOverlayOpacity(opacity);
 });
 
 ui.autoRotate.addEventListener("change", () => {
@@ -698,12 +725,12 @@ function createEarthEngine(THREE, canvas) {
   const root = new THREE.Group();
   scene.add(root);
 
-  const earthTexture = createEarthTexture(THREE);
+  const fallbackEarthTexture = createEarthTexture(THREE);
   const bumpTexture = createBumpTexture(THREE);
   const globe = new THREE.Mesh(
     new THREE.SphereGeometry(2, 160, 160),
     new THREE.MeshStandardMaterial({
-      map: earthTexture,
+      map: fallbackEarthTexture,
       bumpMap: bumpTexture,
       bumpScale: 0.055,
       roughness: 0.78,
@@ -741,7 +768,14 @@ function createEarthEngine(THREE, canvas) {
   );
   root.add(atmosphere);
 
-  root.add(createGrid(THREE));
+  const gridOverlay = createGrid(THREE);
+  root.add(gridOverlay);
+  const coastlineOverlay = createCoastlineOverlay(THREE);
+  root.add(coastlineOverlay);
+  const terrainOverlay = createSurfaceModeOverlay(THREE, 0xb88f59, 0.0);
+  const bathymetryOverlay = createSurfaceModeOverlay(THREE, 0x064b7c, 0.0);
+  root.add(terrainOverlay);
+  root.add(bathymetryOverlay);
   scene.add(createStars(THREE));
   scene.add(createSunGlow(THREE));
 
@@ -773,7 +807,9 @@ function createEarthEngine(THREE, canvas) {
   let speed = 1.2;
   let viewMode = "cinematic";
   let activeWildfireModel = null;
+  let overlayOpacity = Number(ui.overlayOpacity.value) / 100;
   const clock = new THREE.Clock();
+  loadPremiumEarthTextures(THREE, globe, clouds, cityLights);
 
   function resize() {
     const width = window.innerWidth;
@@ -818,6 +854,39 @@ function createEarthEngine(THREE, canvas) {
     });
   }
 
+  function setEarthLayers(nextLayers) {
+    globe.visible = nextLayers.satellite;
+    cityLights.visible = nextLayers.night;
+    clouds.visible = nextLayers.clouds;
+    atmosphere.visible = nextLayers.atmosphere;
+    gridOverlay.visible = nextLayers.grid;
+    coastlineOverlay.visible = nextLayers.coastlines;
+    terrainOverlay.visible = nextLayers.terrain;
+    bathymetryOverlay.visible = nextLayers.bathymetry;
+    terrainOverlay.material.opacity = nextLayers.terrain ? 0.18 : 0;
+    bathymetryOverlay.material.opacity = nextLayers.bathymetry ? 0.16 : 0;
+    globe.material.bumpScale = nextLayers.terrain ? 0.09 : 0.055;
+    globe.material.needsUpdate = true;
+  }
+
+  function setOverlayOpacity(value) {
+    overlayOpacity = value;
+    Object.values(layers).forEach((layer) => {
+      layer.traverse((child) => {
+        if (child.material?.transparent) {
+          child.material.userData.baseOpacity ??= child.material.opacity;
+          child.material.opacity = child.material.userData.baseOpacity * overlayOpacity;
+        }
+      });
+    });
+    gridOverlay.children.forEach((child) => {
+      if (child.material) child.material.opacity = 0.04 + overlayOpacity * 0.12;
+    });
+    coastlineOverlay.children.forEach((child) => {
+      if (child.material) child.material.opacity = 0.12 + overlayOpacity * 0.28;
+    });
+  }
+
   function setLiveEvents(events) {
     clearGroup(layers.live);
     events.slice(0, 80).forEach((event) => {
@@ -856,6 +925,8 @@ function createEarthEngine(THREE, canvas) {
       globe.rotation.y += 0.00055 * dt;
       clouds.rotation.y += 0.0014 * dt;
       cityLights.rotation.y += 0.00055 * dt;
+      terrainOverlay.rotation.y += 0.00055 * dt;
+      bathymetryOverlay.rotation.y += 0.00055 * dt;
     }
 
     layers.weather.children.forEach((item, index) => {
@@ -895,6 +966,8 @@ function createEarthEngine(THREE, canvas) {
 
   window.addEventListener("resize", resize);
   resize();
+  setEarthLayers(earthLayers);
+  setOverlayOpacity(overlayOpacity);
 
   return {
     animate,
@@ -905,6 +978,8 @@ function createEarthEngine(THREE, canvas) {
     setAutoRotate,
     setSpeed,
     setWildfireModel,
+    setEarthLayers,
+    setOverlayOpacity,
   };
 }
 
@@ -1250,35 +1325,160 @@ function createCityLights(THREE) {
   );
 }
 
+function loadPremiumEarthTextures(THREE, globe, clouds, cityLights) {
+  ui.earthTextureStatus.textContent = "Loading";
+  const loader = new THREE.TextureLoader();
+  loader.setCrossOrigin("anonymous");
+  const textureBase = "https://threejs.org/examples/textures/planets/";
+  const assets = {
+    earth: `${textureBase}earth_atmos_2048.jpg`,
+    bump: `${textureBase}earth_bump_2048.jpg`,
+    specular: `${textureBase}earth_specular_2048.jpg`,
+    clouds: `${textureBase}earth_clouds_1024.png`,
+    lights: `${textureBase}earth_lights_2048.png`,
+  };
+
+  Promise.allSettled(Object.entries(assets).map(([key, url]) => loadTexture(loader, url).then((texture) => [key, texture])))
+    .then((results) => {
+      const loaded = Object.fromEntries(
+        results
+          .filter((result) => result.status === "fulfilled")
+          .map((result) => result.value),
+      );
+
+      if (loaded.earth) {
+        loaded.earth.colorSpace = THREE.SRGBColorSpace;
+        globe.material.map = loaded.earth;
+      }
+      if (loaded.bump) {
+        globe.material.bumpMap = loaded.bump;
+        globe.material.bumpScale = 0.035;
+      }
+      if (loaded.specular) {
+        globe.material.roughnessMap = loaded.specular;
+        globe.material.roughness = 0.66;
+      }
+      globe.material.needsUpdate = true;
+
+      if (loaded.clouds) {
+        clouds.material.map = loaded.clouds;
+        clouds.material.opacity = 0.28;
+        clouds.material.needsUpdate = true;
+      }
+      if (loaded.lights) {
+        loaded.lights.colorSpace = THREE.SRGBColorSpace;
+        cityLights.material.map = loaded.lights;
+        cityLights.material.size = 0.018;
+        cityLights.material.needsUpdate = true;
+      }
+
+      const count = Object.keys(loaded).length;
+      ui.earthTextureStatus.textContent = count >= 3 ? "Premium" : "Fallback";
+    })
+    .catch(() => {
+      ui.earthTextureStatus.textContent = "Fallback";
+    });
+}
+
+function loadTexture(loader, url) {
+  return new Promise((resolve, reject) => {
+    loader.load(url, resolve, undefined, reject);
+  });
+}
+
 function createEarthTexture(THREE) {
   const canvas = document.createElement("canvas");
-  canvas.width = 1024;
-  canvas.height = 512;
+  canvas.width = 2048;
+  canvas.height = 1024;
   const ctx = canvas.getContext("2d");
-  const ocean = ctx.createLinearGradient(0, 0, 1024, 512);
-  ocean.addColorStop(0, "#09233f");
-  ocean.addColorStop(0.55, "#0b4d78");
-  ocean.addColorStop(1, "#2aa5e8");
+  const ocean = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  ocean.addColorStop(0, "#0b2440");
+  ocean.addColorStop(0.28, "#0b4e78");
+  ocean.addColorStop(0.52, "#126b94");
+  ocean.addColorStop(0.72, "#0b4e78");
+  ocean.addColorStop(1, "#071b35");
   ctx.fillStyle = ocean;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  for (let i = 0; i < 260; i += 1) {
-    const lon = -180 + Math.random() * 360;
-    const lat = -65 + Math.random() * 135;
-    if (!isKnownLandCluster(lat, lon) && Math.random() > 0.22) continue;
-    const x = ((lon + 180) / 360) * canvas.width;
-    const y = ((90 - lat) / 180) * canvas.height;
-    const r = 12 + Math.random() * 42;
-    ctx.fillStyle = Math.random() > 0.45 ? "rgba(55, 142, 104, 0.72)" : "rgba(98, 125, 87, 0.62)";
+  drawBathymetry(ctx, canvas);
+  drawContinentSet(ctx, canvas, true);
+  drawPolarIce(ctx, canvas);
+  drawSubtleCloudShadows(ctx, canvas);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function drawBathymetry(ctx, canvas) {
+  ctx.save();
+  for (let i = 0; i < 90; i += 1) {
+    const y = (i / 90) * canvas.height;
+    ctx.strokeStyle = `rgba(125, 205, 235, ${0.018 + Math.sin(i * 0.37) * 0.008})`;
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.ellipse(x, y, r * (0.8 + Math.random()), r * (0.35 + Math.random() * 0.65), Math.random() * Math.PI, 0, Math.PI * 2);
+    for (let x = 0; x <= canvas.width; x += 48) {
+      const wave = Math.sin(x * 0.006 + i * 0.4) * 8 + Math.cos(x * 0.011 + i) * 5;
+      if (x === 0) ctx.moveTo(x, y + wave);
+      else ctx.lineTo(x, y + wave);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawContinentSet(ctx, canvas, filled) {
+  continentPolygons().forEach((polygon, index) => {
+    const points = polygon.map(([lon, lat]) => lonLatToCanvas(lon, lat, canvas));
+    ctx.beginPath();
+    points.forEach((point, pointIndex) => {
+      if (pointIndex === 0) ctx.moveTo(point.x, point.y);
+      else ctx.lineTo(point.x, point.y);
+    });
+    ctx.closePath();
+
+    if (filled) {
+      const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+      gradient.addColorStop(0, index % 2 ? "#315f3f" : "#486f3e");
+      gradient.addColorStop(0.55, index % 2 ? "#7c7650" : "#5c7c4a");
+      gradient.addColorStop(1, "#b99b63");
+      ctx.fillStyle = gradient;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(230, 240, 215, 0.28)";
+      ctx.lineWidth = 2.1;
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = "rgba(202, 244, 255, 0.55)";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+  });
+}
+
+function drawPolarIce(ctx, canvas) {
+  const north = ctx.createLinearGradient(0, 0, 0, 120);
+  north.addColorStop(0, "rgba(247,252,255,0.9)");
+  north.addColorStop(1, "rgba(247,252,255,0)");
+  ctx.fillStyle = north;
+  ctx.fillRect(0, 0, canvas.width, 125);
+
+  const south = ctx.createLinearGradient(0, canvas.height - 150, 0, canvas.height);
+  south.addColorStop(0, "rgba(247,252,255,0)");
+  south.addColorStop(1, "rgba(247,252,255,0.95)");
+  ctx.fillStyle = south;
+  ctx.fillRect(0, canvas.height - 155, canvas.width, 155);
+}
+
+function drawSubtleCloudShadows(ctx, canvas) {
+  for (let i = 0; i < 180; i += 1) {
+    const x = Math.random() * canvas.width;
+    const y = Math.random() * canvas.height;
+    const r = 16 + Math.random() * 58;
+    const gradient = ctx.createRadialGradient(x, y, 1, x, y, r);
+    gradient.addColorStop(0, "rgba(255,255,255,0.08)");
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
   }
-
-  ctx.fillStyle = "rgba(232, 244, 255, 0.78)";
-  ctx.fillRect(0, 0, canvas.width, 28);
-  ctx.fillRect(0, canvas.height - 34, canvas.width, 34);
-  return new THREE.CanvasTexture(canvas);
 }
 
 function createBumpTexture(THREE) {
@@ -1291,6 +1491,51 @@ function createBumpTexture(THREE) {
   for (let i = 0; i < 1400; i += 1) {
     ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.16})`;
     ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 1 + Math.random() * 3, 1 + Math.random() * 3);
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createCoastlineOverlay(THREE) {
+  const group = new THREE.Group();
+  const material = new THREE.LineBasicMaterial({
+    color: 0xbdefff,
+    transparent: true,
+    opacity: 0.32,
+  });
+  continentPolygons().forEach((polygon) => {
+    const points = polygon.map(([lon, lat]) => latLonToVector3(lat, lon, 2.031));
+    points.push(points[0].clone());
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material.clone()));
+  });
+  return group;
+}
+
+function createSurfaceModeOverlay(THREE, color, opacity) {
+  return new THREE.Mesh(
+    new THREE.SphereGeometry(2.026, 128, 128),
+    new THREE.MeshBasicMaterial({
+      map: createSurfaceModeTexture(THREE, color),
+      transparent: true,
+      opacity,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+}
+
+function createSurfaceModeTexture(THREE, color) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext("2d");
+  const hex = `#${color.toString(16).padStart(6, "0")}`;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let y = 0; y < canvas.height; y += 8) {
+    for (let x = 0; x < canvas.width; x += 8) {
+      const value = (Math.sin(x * 0.018) + Math.cos(y * 0.025) + Math.sin((x + y) * 0.011)) / 3;
+      ctx.fillStyle = value > 0.05 ? `${hex}55` : `${hex}18`;
+      ctx.fillRect(x, y, 8, 8);
+    }
   }
   return new THREE.CanvasTexture(canvas);
 }
@@ -1314,6 +1559,52 @@ function createCloudTexture(THREE) {
     ctx.fill();
   }
   return new THREE.CanvasTexture(canvas);
+}
+
+function continentPolygons() {
+  return [
+    // North America
+    [
+      [-168, 72], [-142, 70], [-124, 58], [-117, 49], [-101, 52], [-84, 48], [-60, 52],
+      [-53, 45], [-70, 31], [-82, 26], [-97, 18], [-112, 24], [-124, 32], [-130, 46],
+      [-150, 58],
+    ],
+    // South America
+    [
+      [-82, 12], [-68, 9], [-52, -6], [-38, -17], [-44, -32], [-55, -54], [-68, -52],
+      [-74, -35], [-80, -12],
+    ],
+    // Europe and Asia
+    [
+      [-10, 36], [4, 54], [31, 60], [60, 58], [88, 66], [132, 55], [158, 48], [148, 30],
+      [122, 20], [104, 8], [78, 7], [68, 23], [46, 28], [31, 37], [13, 43],
+    ],
+    // Africa
+    [
+      [-18, 34], [7, 37], [31, 31], [42, 10], [38, -19], [27, -35], [13, -35], [0, -24],
+      [-12, -4], [-16, 18],
+    ],
+    // Australia
+    [
+      [112, -11], [132, -10], [153, -25], [146, -39], [126, -36], [113, -25],
+    ],
+    // Greenland
+    [
+      [-53, 60], [-32, 67], [-25, 78], [-48, 84], [-69, 78], [-72, 66],
+    ],
+    // Antarctica
+    [
+      [-180, -70], [-120, -74], [-60, -68], [0, -76], [60, -69], [120, -73], [180, -70],
+      [180, -90], [-180, -90],
+    ],
+  ];
+}
+
+function lonLatToCanvas(lon, lat, canvas) {
+  return {
+    x: ((lon + 180) / 360) * canvas.width,
+    y: ((90 - lat) / 180) * canvas.height,
+  };
 }
 
 function makeLatitude(THREE, lat, material) {

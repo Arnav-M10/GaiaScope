@@ -46,6 +46,51 @@
         <button type="button" data-view="response">Response</button>
       </nav>
 
+      <aside class="panel earth-panel" aria-label="Global Earth layers">
+        <div class="panel-title">
+          <span>Earth stack</span>
+          <strong id="earthTextureStatus">Loading</strong>
+        </div>
+        <details open>
+          <summary>Global layers</summary>
+          <div class="layer-control-grid">
+            <label><input type="checkbox" data-earth-layer="satellite" checked /> Satellite Earth</label>
+            <label><input type="checkbox" data-earth-layer="night" checked /> Night lights</label>
+            <label><input type="checkbox" data-earth-layer="clouds" checked /> Clouds</label>
+            <label><input type="checkbox" data-earth-layer="atmosphere" checked /> Atmosphere</label>
+            <label><input type="checkbox" data-earth-layer="grid" checked /> Lat/lon grid</label>
+            <label><input type="checkbox" data-earth-layer="coastlines" checked /> Coastlines</label>
+            <label><input type="checkbox" data-earth-layer="terrain" /> Terrain mode</label>
+            <label><input type="checkbox" data-earth-layer="bathymetry" /> Bathymetry</label>
+          </div>
+        </details>
+        <details>
+          <summary>Weather intelligence</summary>
+          <div class="feature-chip-grid">
+            <span>Wind vectors <b>sim</b></span>
+            <span>Pressure contours <b>sim</b></span>
+            <span>Rain layer <b>sim</b></span>
+            <span>NWS alerts <b>live</b></span>
+            <span>Storm tracks <b>sim</b></span>
+          </div>
+        </details>
+        <details>
+          <summary>Risk infrastructure</summary>
+          <div class="feature-chip-grid">
+            <span>Hospitals <b>placeholder</b></span>
+            <span>Roads <b>placeholder</b></span>
+            <span>Power grid <b>placeholder</b></span>
+            <span>Ports <b>placeholder</b></span>
+            <span>Population exposure <b>estimated</b></span>
+          </div>
+        </details>
+        <label class="range-row" for="overlayOpacity">
+          <span>Overlay opacity</span>
+          <output id="overlayOpacityValue">72%</output>
+        </label>
+        <input id="overlayOpacity" type="range" min="20" max="100" value="72" />
+      </aside>
+
       <aside class="panel scenario-panel" aria-label="Scenario controls">
         <div class="panel-title">
           <span>Scenario</span>

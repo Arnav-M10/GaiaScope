@@ -214,6 +214,15 @@ h1 {
   padding: 14px;
 }
 
+.earth-panel {
+  left: 22px;
+  top: 168px;
+  max-height: calc(100vh - 610px);
+  min-height: 270px;
+  overflow: auto;
+  padding: 14px;
+}
+
 .intelligence-panel {
   right: 22px;
   top: 104px;
@@ -281,6 +290,65 @@ h1 {
 .confidence-rows {
   display: grid;
   gap: 8px;
+}
+
+details {
+  border: 1px solid rgba(144, 218, 255, 0.12);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.032);
+}
+
+summary {
+  cursor: pointer;
+  padding: 9px 10px;
+  color: #d9edf8;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.layer-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  padding: 0 9px 9px;
+}
+
+.layer-control-grid label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 8px;
+  padding: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #c7dce9;
+  font-size: 0.74rem;
+}
+
+.layer-control-grid input {
+  accent-color: var(--blue);
+}
+
+.feature-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 9px 9px;
+}
+
+.feature-chip-grid span {
+  border-radius: 999px;
+  padding: 5px 7px;
+  background: rgba(84, 216, 255, 0.09);
+  color: #cfeaf5;
+  font-size: 0.68rem;
+}
+
+.feature-chip-grid b {
+  color: var(--yellow);
+  font-weight: 800;
 }
 
 .scenario-button {
@@ -834,8 +902,16 @@ h2 {
   .scenario-panel {
     left: 16px;
     right: 16px;
+    top: 910px;
+    bottom: auto;
+  }
+
+  .earth-panel {
+    left: 16px;
+    right: 16px;
     top: 700px;
     bottom: auto;
+    max-height: none;
   }
 
   .telemetry-strip {
@@ -862,7 +938,7 @@ h2 {
   .physics-panel {
     left: 16px;
     right: 16px;
-    top: 1110px;
+    top: 1320px;
     bottom: auto;
     width: auto;
     min-width: 0;
@@ -871,7 +947,7 @@ h2 {
   .confidence-panel {
     left: 16px;
     right: 16px;
-    top: 1335px;
+    top: 1545px;
     bottom: auto;
     width: auto;
     min-width: 0;
@@ -880,13 +956,13 @@ h2 {
   .intelligence-panel {
     left: 16px;
     right: 16px;
-    top: 1585px;
+    top: 1795px;
   }
 
   .live-panel {
     left: 16px;
     right: 16px;
-    top: 1790px;
+    top: 2000px;
     bottom: auto;
     max-height: none;
   }
