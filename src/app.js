@@ -181,9 +181,14 @@ const ui = {
   lastUpdated: document.querySelector("#lastUpdated"),
   fieldCanvas: document.querySelector("#field-canvas"),
   confidenceScore: document.querySelector("#confidenceScore"),
-  confidenceSummary: document.querySelector("#confidenceSummary"),
+  sourceModeBanner: document.querySelector("#sourceModeBanner"),
+  sourceModeLabel: document.querySelector("#sourceModeLabel"),
+  sourceModeDetail: document.querySelector("#sourceModeDetail"),
+  copyModelSummary: document.querySelector("#copyModelSummary"),
   confidenceRows: document.querySelector("#confidenceRows"),
   wildfireAudit: document.querySelector("#wildfireAudit"),
+  windCompassArrow: document.querySelector("#windCompassArrow"),
+  windCompassSpeed: document.querySelector("#windCompassSpeed"),
 };
 
 let activeScenario = "hurricane";
@@ -246,6 +251,10 @@ ui.autoRotate.addEventListener("change", () => {
 
 ui.refreshFeeds.addEventListener("click", () => {
   refreshLiveFeeds();
+});
+
+ui.copyModelSummary.addEventListener("click", () => {
+  copyWildfireSummary();
 });
 
 async function boot() {
@@ -468,35 +477,126 @@ function renderScenario() {
 function renderConfidencePanel() {
   if (wildfireLoading) {
     ui.confidenceScore.textContent = "Loading";
-    ui.confidenceSummary.textContent = "Fetching wildfire proxy inputs and rebuilding spread/smoke model.";
-    ui.confidenceRows.innerHTML = `<div class="confidence-row"><span><b>Assimilation</b><small>Contacting local proxy for FIRMS, NWS, and Open-Meteo.</small></span><strong class="confidence-badge is-simulated">running</strong></div>`;
+    setSourceModeBanner("Loading wildfire model", "Fetching wildfire proxy inputs and rebuilding spread/smoke model.", "neutral");
+    ui.copyModelSummary.disabled = true;
+    ui.confidenceRows.innerHTML = groupedConfidenceRows([
+      {
+        label: "Assimilation",
+        status: "simulated",
+        detail: "Contacting local proxy for FIRMS, NWS, and Open-Meteo.",
+      },
+    ]);
     ui.wildfireAudit.innerHTML = "";
+    renderWindCompass(null);
     return;
   }
 
   if (!wildfireModel) {
     ui.confidenceScore.textContent = "--";
-    ui.confidenceSummary.textContent = "Select Wildfire to inspect live, estimated, simulated, and missing inputs.";
+    setSourceModeBanner(
+      "No wildfire model loaded",
+      "Select Wildfire to inspect live, estimated, simulated, and missing inputs.",
+      "neutral",
+    );
+    ui.copyModelSummary.disabled = true;
     ui.confidenceRows.innerHTML = "";
     ui.wildfireAudit.innerHTML = "";
+    renderWindCompass(null);
     return;
   }
 
   const score = Math.round(wildfireModel.confidence.score * 100);
   ui.confidenceScore.textContent = `${score}%`;
-  ui.confidenceSummary.textContent =
+  const summary =
     activeScenario === "wildfire"
       ? `${wildfireModel.sourceMode.label}: ${wildfireModel.sourceMode.detail}`
       : "Wildfire model is ready in the background; select Wildfire to inspect operational inputs.";
-  ui.confidenceRows.innerHTML = wildfireModel.confidence.rows
-    .map(
-      (row) => `<div class="confidence-row">
-        <span><b>${escapeHtml(row.label)}</b><small>${escapeHtml(row.detail)}</small></span>
-        <strong class="confidence-badge is-${escapeHtml(row.status)}">${escapeHtml(row.status)}</strong>
-      </div>`,
-    )
-    .join("");
+  setSourceModeBanner(wildfireModel.sourceMode.label, summary, sourceModeClass(wildfireModel.sourceMode.label));
+  ui.copyModelSummary.disabled = false;
+  ui.confidenceRows.innerHTML = groupedConfidenceRows(wildfireModel.confidence.rows);
   ui.wildfireAudit.innerHTML = renderWildfireAudit(wildfireModel);
+  renderWindCompass(wildfireModel);
+}
+
+function setSourceModeBanner(label, detail, mode) {
+  ui.sourceModeLabel.textContent = label;
+  ui.sourceModeDetail.textContent = detail;
+  ui.sourceModeBanner.className = `source-mode-banner is-${mode}`;
+}
+
+function sourceModeClass(label) {
+  const normalized = label.toLowerCase();
+  if (normalized.includes("demo") || normalized.includes("low-confidence")) return "demo";
+  if (normalized.includes("synthetic")) return "synthetic";
+  if (normalized.includes("operational")) return "live";
+  return "neutral";
+}
+
+function groupedConfidenceRows(rows) {
+  const groups = [
+    ["Live", rows.filter((row) => row.status === "live")],
+    ["Estimated", rows.filter((row) => row.status === "estimated")],
+    ["Simulated", rows.filter((row) => row.status === "simulated")],
+    ["Missing / Fallback", rows.filter((row) => ["missing", "fallback", "error"].includes(row.status))],
+  ];
+  return groups
+    .filter(([, groupRows]) => groupRows.length)
+    .map(([title, groupRows]) => `<section class="confidence-group">
+      <h3>${escapeHtml(title)}</h3>
+      ${groupRows
+        .map(
+          (row) => `<div class="confidence-row">
+            <span><b>${escapeHtml(row.label)}</b><small>${escapeHtml(row.detail)}</small></span>
+            <strong class="confidence-badge is-${escapeHtml(row.status)}">${escapeHtml(row.status)}</strong>
+          </div>`,
+        )
+        .join("")}
+    </section>`)
+    .join("");
+}
+
+function renderWindCompass(model) {
+  if (!model) {
+    ui.windCompassArrow.style.setProperty("--wind-deg", "0deg");
+    ui.windCompassSpeed.textContent = "-- mph";
+    return;
+  }
+  ui.windCompassArrow.style.setProperty("--wind-deg", `${Math.round(model.wind.directionDeg)}deg`);
+  ui.windCompassSpeed.textContent = `${Math.round(model.wind.speedMph)} mph`;
+}
+
+async function copyWildfireSummary() {
+  if (!wildfireModel) return;
+  const text = wildfireSummaryText(wildfireModel);
+  try {
+    await navigator.clipboard.writeText(text);
+    ui.copyModelSummary.textContent = "Copied";
+    setTimeout(() => {
+      ui.copyModelSummary.textContent = "Copy model summary";
+    }, 1400);
+  } catch {
+    ui.copyModelSummary.textContent = "Copy failed";
+    setTimeout(() => {
+      ui.copyModelSummary.textContent = "Copy model summary";
+    }, 1600);
+  }
+}
+
+function wildfireSummaryText(model) {
+  const audit = model.audit;
+  return [
+    "GaiaScope wildfire model summary",
+    `Source mode: ${model.sourceMode.label}`,
+    `Confidence score: ${Math.round(model.confidence.score * 100)}%`,
+    `Wind: ${audit.windSpeedMph.toFixed(1)} mph @ ${Math.round(audit.windDirectionDeg)} deg`,
+    `Humidity: ${Math.round(audit.humidityPct)}% RH`,
+    `Fuel dryness: ${Math.round(audit.fuelDryness * 100)}%`,
+    `Slope grade/aspect: ${Math.round(audit.slopeGrade * 100)}% @ ${Math.round(audit.slopeAspectDeg)} deg`,
+    `Spread area: ${audit.spreadAreaKm2.toFixed(1)} km2`,
+    `Head-fire rate: ${audit.headFireRateKmh.toFixed(1)} km/h`,
+    `Smoke particle count: ${audit.smokeParticleCount}`,
+    `Input source summary: ${audit.sourceSummary}`,
+  ].join("\n");
 }
 
 function wildfireExplanations(model) {

@@ -155,10 +155,20 @@
           <span>Wildfire model confidence</span>
           <strong id="confidenceScore">--</strong>
         </div>
-        <p id="confidenceSummary" class="last-updated">Select Wildfire to inspect live, estimated, simulated, and missing inputs.</p>
+        <div id="sourceModeBanner" class="source-mode-banner is-neutral">
+          <span id="sourceModeLabel">No wildfire model loaded</span>
+          <small id="sourceModeDetail">Select Wildfire to inspect live, estimated, simulated, and missing inputs.</small>
+        </div>
+        <button id="copyModelSummary" class="copy-summary-button" type="button">Copy model summary</button>
         <div id="confidenceRows" class="confidence-rows"></div>
         <div class="model-audit">
-          <h2>Model audit</h2>
+          <div class="audit-heading">
+            <h2>Model audit</h2>
+            <div class="wind-compass" aria-label="Wildfire wind direction">
+              <span id="windCompassArrow"></span>
+              <strong id="windCompassSpeed">-- mph</strong>
+            </div>
+          </div>
           <div id="wildfireAudit" class="audit-grid"></div>
         </div>
       </section>
@@ -186,6 +196,10 @@
         <strong>3D engine unavailable</strong>
         <span>GaiaScope needs WebGL and access to the Three.js module CDN for this prototype.</span>
       </div>
+
+      <footer class="safety-badge" aria-label="Safety disclaimer">
+        Not for emergency use
+      </footer>
     </main>
 
     <script type="module" src="./src/app.js"></script>

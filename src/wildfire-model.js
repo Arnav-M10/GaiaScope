@@ -271,7 +271,7 @@ function determineSourceMode(payload, confidence) {
     };
   }
   return {
-    label: "Operational sandbox",
+    label: "Operational prototype",
     detail: "Live and estimated inputs are blended into the spread and smoke solver.",
   };
 }
