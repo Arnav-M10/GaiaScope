@@ -197,6 +197,61 @@ h1 {
   box-shadow: inset 0 0 0 1px rgba(84, 216, 255, 0.28);
 }
 
+.mission-panel {
+  position: fixed;
+  z-index: 6;
+  top: 168px;
+  left: 50%;
+  display: grid;
+  gap: 9px;
+  width: min(430px, calc(100vw - 720px));
+  min-width: 330px;
+  border: 1px solid rgba(144, 218, 255, 0.16);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(4, 14, 24, 0.62);
+  color: #cde5f1;
+  transform: translateX(-50%);
+  backdrop-filter: blur(18px);
+}
+
+.mission-panel p {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.42;
+}
+
+.mission-panel button,
+.copy-summary-button {
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.mission-panel button {
+  justify-self: start;
+  border: 1px solid rgba(84, 216, 255, 0.22);
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(84, 216, 255, 0.12);
+  color: #dff8ff;
+  cursor: pointer;
+}
+
+.mission-panel button:hover,
+.copy-summary-button:hover:not(:disabled) {
+  background: rgba(84, 216, 255, 0.2);
+}
+
+.what-seeing-text {
+  border-left: 2px solid rgba(84, 216, 255, 0.7);
+  padding-left: 10px;
+  color: #e4f6ff;
+  font-size: 0.76rem;
+  line-height: 1.42;
+}
+
 .panel {
   position: fixed;
   z-index: 5;
@@ -252,6 +307,78 @@ h1 {
   width: min(360px, calc(100vw - 1180px));
   min-width: 330px;
   padding: 14px;
+}
+
+.legend-panel {
+  position: fixed;
+  z-index: 5;
+  right: 22px;
+  bottom: 18px;
+  display: grid;
+  gap: 6px;
+  width: min(320px, calc(100vw - 48px));
+  border: 1px solid rgba(144, 218, 255, 0.16);
+  border-radius: 8px;
+  padding: 11px;
+  background: rgba(4, 14, 24, 0.62);
+  color: #c7dce9;
+  font-size: 0.72rem;
+  backdrop-filter: blur(18px);
+}
+
+.legend-panel strong {
+  color: #f6fbff;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.legend-panel span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.legend-panel i {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  box-shadow: 0 0 14px currentColor;
+}
+
+.legend-cyan {
+  color: var(--blue);
+  background: var(--blue);
+}
+
+.legend-fire {
+  color: var(--orange);
+  background: linear-gradient(135deg, var(--orange), var(--red));
+}
+
+.legend-quake {
+  color: var(--yellow);
+  background: var(--yellow);
+}
+
+.legend-smoke {
+  color: #d5dedc;
+  background: #d5dedc;
+  opacity: 0.72;
+}
+
+.legend-risk {
+  color: var(--green);
+  width: 24px !important;
+  background: linear-gradient(90deg, var(--green), var(--yellow), var(--red));
+}
+
+.legend-live {
+  color: var(--green);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: var(--green);
+  animation: pulse 1.9s infinite;
 }
 
 .panel-title {
@@ -615,6 +742,11 @@ h2 {
   opacity: 0.5;
 }
 
+.copy-summary-button.is-hidden,
+.wind-compass.is-hidden {
+  display: none;
+}
+
 .factor-track,
 .timeline-track {
   height: 6px;
@@ -899,6 +1031,15 @@ h2 {
     justify-content: center;
   }
 
+  .mission-panel {
+    left: 16px;
+    right: 16px;
+    top: 320px;
+    width: auto;
+    min-width: 0;
+    transform: none;
+  }
+
   .scenario-panel {
     left: 16px;
     right: 16px;
@@ -917,7 +1058,7 @@ h2 {
   .telemetry-strip {
     left: 16px;
     right: 16px;
-    top: 590px;
+    top: 650px;
     bottom: auto;
     grid-template-columns: repeat(2, 1fr);
     width: auto;
@@ -928,7 +1069,7 @@ h2 {
     position: absolute;
     left: 16px;
     bottom: auto;
-    top: 540px;
+    top: 600px;
   }
 
   .telemetry-strip article:nth-child(2) {
@@ -970,5 +1111,14 @@ h2 {
   #earth-canvas {
     position: absolute;
     height: 760px;
+  }
+
+  .legend-panel {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    top: 2225px;
+    bottom: auto;
+    width: auto;
   }
 }

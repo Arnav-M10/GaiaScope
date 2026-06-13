@@ -196,6 +196,7 @@ const ui = {
   sourceModeLabel: document.querySelector("#sourceModeLabel"),
   sourceModeDetail: document.querySelector("#sourceModeDetail"),
   copyModelSummary: document.querySelector("#copyModelSummary"),
+  scenarioModelTitle: document.querySelector("#scenarioModelTitle"),
   confidenceRows: document.querySelector("#confidenceRows"),
   wildfireAudit: document.querySelector("#wildfireAudit"),
   windCompassArrow: document.querySelector("#windCompassArrow"),
@@ -203,6 +204,9 @@ const ui = {
   earthTextureStatus: document.querySelector("#earthTextureStatus"),
   overlayOpacity: document.querySelector("#overlayOpacity"),
   overlayOpacityValue: document.querySelector("#overlayOpacityValue"),
+  followRegion: document.querySelector("#followRegion"),
+  whatSeeingButton: document.querySelector("#whatSeeingButton"),
+  whatSeeingText: document.querySelector("#whatSeeingText"),
 };
 
 let activeScenario = "hurricane";
@@ -229,6 +233,7 @@ document.querySelectorAll("[data-layer]").forEach((checkbox) => {
   checkbox.addEventListener("change", (event) => {
     enabledLayers[event.target.dataset.layer] = event.target.checked;
     engine?.setLayerVisibility(enabledLayers);
+    renderWhatSeeingText();
   });
 });
 
@@ -276,12 +281,23 @@ ui.autoRotate.addEventListener("change", () => {
   engine?.setAutoRotate(ui.autoRotate.checked);
 });
 
+ui.followRegion.addEventListener("change", () => {
+  if (ui.followRegion.checked) {
+    engine?.focusScenario(scenarios[activeScenario], enabledLayers, { follow: true });
+  }
+});
+
 ui.refreshFeeds.addEventListener("click", () => {
   refreshLiveFeeds();
 });
 
 ui.copyModelSummary.addEventListener("click", () => {
   copyWildfireSummary();
+});
+
+ui.whatSeeingButton.addEventListener("click", () => {
+  ui.whatSeeingText.hidden = !ui.whatSeeingText.hidden;
+  renderWhatSeeingText();
 });
 
 async function boot() {
@@ -365,7 +381,7 @@ async function refreshWildfireModel() {
     if (activeScenario === "wildfire") {
       fieldModel?.setWildfireModel(wildfireModel);
       engine?.setWildfireModel(wildfireModel);
-      engine?.focusScenario(scenarios.wildfire, enabledLayers);
+      engine?.focusScenario(scenarios.wildfire, enabledLayers, { follow: ui.followRegion.checked });
     }
     renderScenario();
     renderConfidencePanel();
@@ -424,7 +440,8 @@ function setScenario(key) {
   if (key === "wildfire" && wildfireModel) {
     engine?.setWildfireModel(wildfireModel);
   }
-  engine?.focusScenario(scenarios[key], enabledLayers);
+  engine?.focusScenario(scenarios[key], enabledLayers, { follow: ui.followRegion.checked });
+  engine?.setOverlayOpacity(Number(ui.overlayOpacity.value) / 100);
   if (key === "wildfire" && wildfireModel) {
     fieldModel?.setWildfireModel(wildfireModel);
   } else {
@@ -499,13 +516,22 @@ function renderScenario() {
     button.classList.toggle("is-active", button.dataset.scenario === activeScenario);
   });
   renderConfidencePanel();
+  renderWhatSeeingText();
 }
 
 function renderConfidencePanel() {
+  if (activeScenario !== "wildfire") {
+    renderScenarioDiagnosticsPanel();
+    return;
+  }
+
   if (wildfireLoading) {
+    ui.scenarioModelTitle.textContent = "Wildfire model confidence";
     ui.confidenceScore.textContent = "Loading";
     setSourceModeBanner("Loading wildfire model", "Fetching wildfire proxy inputs and rebuilding spread/smoke model.", "neutral");
     ui.copyModelSummary.disabled = true;
+    ui.copyModelSummary.classList.remove("is-hidden");
+    ui.windCompassSpeed.closest(".wind-compass")?.classList.remove("is-hidden");
     ui.confidenceRows.innerHTML = groupedConfidenceRows([
       {
         label: "Assimilation",
@@ -519,6 +545,7 @@ function renderConfidencePanel() {
   }
 
   if (!wildfireModel) {
+    ui.scenarioModelTitle.textContent = "Wildfire model confidence";
     ui.confidenceScore.textContent = "--";
     setSourceModeBanner(
       "No wildfire model loaded",
@@ -526,23 +553,142 @@ function renderConfidencePanel() {
       "neutral",
     );
     ui.copyModelSummary.disabled = true;
+    ui.copyModelSummary.classList.remove("is-hidden");
+    ui.windCompassSpeed.closest(".wind-compass")?.classList.remove("is-hidden");
     ui.confidenceRows.innerHTML = "";
     ui.wildfireAudit.innerHTML = "";
     renderWindCompass(null);
     return;
   }
 
+  ui.scenarioModelTitle.textContent = "Wildfire model confidence";
   const score = Math.round(wildfireModel.confidence.score * 100);
   ui.confidenceScore.textContent = `${score}%`;
-  const summary =
-    activeScenario === "wildfire"
-      ? `${wildfireModel.sourceMode.label}: ${wildfireModel.sourceMode.detail}`
-      : "Wildfire model is ready in the background; select Wildfire to inspect operational inputs.";
-  setSourceModeBanner(wildfireModel.sourceMode.label, summary, sourceModeClass(wildfireModel.sourceMode.label));
+  setSourceModeBanner(
+    wildfireModel.sourceMode.label,
+    `${wildfireModel.sourceMode.label}: ${wildfireModel.sourceMode.detail}`,
+    sourceModeClass(wildfireModel.sourceMode.label),
+  );
   ui.copyModelSummary.disabled = false;
+  ui.copyModelSummary.classList.remove("is-hidden");
+  ui.windCompassSpeed.closest(".wind-compass")?.classList.remove("is-hidden");
   ui.confidenceRows.innerHTML = groupedConfidenceRows(wildfireModel.confidence.rows);
   ui.wildfireAudit.innerHTML = renderWildfireAudit(wildfireModel);
   renderWindCompass(wildfireModel);
+}
+
+function renderScenarioDiagnosticsPanel() {
+  const scenario = scenarios[activeScenario];
+  ui.scenarioModelTitle.textContent = `${scenario.label} diagnostics`;
+  ui.confidenceScore.textContent = `${Math.round(scenario.factors.confidence * 100)}%`;
+  ui.copyModelSummary.disabled = true;
+  ui.copyModelSummary.classList.add("is-hidden");
+  ui.windCompassSpeed.closest(".wind-compass")?.classList.add("is-hidden");
+
+  const mode = {
+    hurricane: [
+      "Hurricane operational view",
+      "Weather forcing, surge, flood, and asset exposure overlays are attached to the Florida coast scenario region.",
+      "synthetic",
+    ],
+    earthquake: [
+      "Earthquake operational view",
+      "Epicenter, wave attenuation, shaking, and coastal screening diagnostics are attached to the Japan trench region.",
+      "live",
+    ],
+    heatwave: [
+      "Heatwave operational view",
+      "Urban heat, vulnerable exposure, air-quality stress, and cooling-access diagnostics are attached to Dallas.",
+      "synthetic",
+    ],
+  }[activeScenario] ?? ["Scenario diagnostics", "Select a scenario to inspect physics layers.", "neutral"];
+
+  setSourceModeBanner(mode[0], mode[1], mode[2]);
+  ui.confidenceRows.innerHTML = groupedConfidenceRows(scenarioConfidenceRows(activeScenario));
+  ui.wildfireAudit.innerHTML = renderScenarioAudit(scenario, activeScenario);
+  renderWindCompass(null);
+}
+
+function scenarioConfidenceRows(key) {
+  const rows = {
+    hurricane: [
+      { label: "NWS alert feed", status: "live", detail: "Public weather alerts are loaded in the Live feeds panel when available." },
+      { label: "Wind/pressure field", status: "simulated", detail: "Cyclonic vectors and pressure cone are generated from the Florida scenario forcing." },
+      { label: "Storm surge", status: "estimated", detail: "Coastal flood surfaces use shallow-water style assumptions and local bathymetry placeholders." },
+      { label: "Facility exposure", status: "estimated", detail: "Hospitals, roads, and substations are placeholder assets until OSM infrastructure is connected." },
+    ],
+    earthquake: [
+      { label: "USGS earthquake feed", status: "live", detail: "Live earthquake markers are read from the public feed and plotted by latitude/longitude." },
+      { label: "Epicenter/wavefront", status: "simulated", detail: "Seismic rings approximate P/S-wave propagation and attenuation around the Japan trench." },
+      { label: "Depth attenuation", status: "estimated", detail: "Shaking intensity uses simplified radial decay because full ground-motion maps are not connected." },
+      { label: "Tsunami screen", status: "fallback", detail: "Coastal risk is scenario-based until NOAA tsunami and bathymetry feeds are wired." },
+    ],
+    heatwave: [
+      { label: "Urban heat layer", status: "simulated", detail: "Heat diffusion is modeled from solar loading, stagnant air, and impervious-surface assumptions." },
+      { label: "Population exposure", status: "estimated", detail: "Exposure is a placeholder metro-scale estimate for the Dallas scenario." },
+      { label: "Air-quality stress", status: "fallback", detail: "OpenAQ is planned, so the current layer is a fallback stress indicator." },
+      { label: "Cooling access", status: "missing", detail: "Cooling centers and canopy equity data are not connected yet." },
+    ],
+  };
+  return rows[key] ?? [];
+}
+
+function renderScenarioAudit(scenario, key) {
+  const auditRows = {
+    hurricane: [
+      ["Selected region", scenario.region],
+      ["Anchor", `${scenario.location[0].toFixed(1)}, ${scenario.location[1].toFixed(1)}`],
+      ["Main overlay", "Wind + surge cone"],
+      ["Data effects", "Earth-attached"],
+      ["Inactive layers", "Dimmed"],
+      ["Camera", "Florida coast"],
+    ],
+    earthquake: [
+      ["Selected region", scenario.region],
+      ["Anchor", `${scenario.location[0].toFixed(1)}, ${scenario.location[1].toFixed(1)}`],
+      ["Main overlay", "Epicenter + waves"],
+      ["Data effects", "Earth-attached"],
+      ["Magnitude", scenario.telemetry[0]],
+      ["Tsunami screen", "Prototype"],
+    ],
+    heatwave: [
+      ["Selected region", scenario.region],
+      ["Anchor", `${scenario.location[0].toFixed(1)}, ${scenario.location[1].toFixed(1)}`],
+      ["Main overlay", "Heat diffusion"],
+      ["Data effects", "Earth-attached"],
+      ["Heat index", scenario.telemetry[0]],
+      ["AQ stress", "Fallback"],
+    ],
+  }[key] ?? [["Selected region", scenario.region]];
+
+  return auditRows
+    .map(
+      ([label, value]) => `<div class="audit-item">
+        <span>${escapeHtml(label)}</span>
+        <strong>${escapeHtml(value)}</strong>
+      </div>`,
+    )
+    .join("");
+}
+
+function renderWhatSeeingText() {
+  if (ui.whatSeeingText.hidden) return;
+  const scenario = scenarios[activeScenario];
+  const layerNames = Object.entries(enabledLayers)
+    .filter(([, enabled]) => enabled)
+    .map(([name]) => name)
+    .join(", ");
+  const scenarioText = {
+    hurricane:
+      "You are viewing the Florida coast hurricane scenario: cyan wind streamlines, a storm-risk cone, coastal flood surfaces, live weather markers, and exposed infrastructure around the selected region.",
+    wildfire:
+      "You are viewing the Northern California wildfire scenario: separate ignition glows, modeled spread cells, an active perimeter, smoke particles drifting downwind, and the wildfire confidence/audit panel.",
+    earthquake:
+      "You are viewing the Japan trench earthquake scenario: a yellow epicenter, expanding seismic wave rings, coastal screening layers, live USGS markers, and simplified shaking diagnostics.",
+    heatwave:
+      "You are viewing the Dallas heatwave scenario: red/orange heat diffusion, urban exposure markers, fallback air-quality stress, and simplified heat-risk diagnostics.",
+  }[activeScenario];
+  ui.whatSeeingText.textContent = `${scenarioText} Active layers: ${layerNames || "none"}. The selected marker and hazard overlays are anchored to ${scenario.region} coordinates and rotate with Earth.`;
 }
 
 function setSourceModeBanner(label, detail, mode) {
@@ -722,8 +868,11 @@ function createEarthEngine(THREE, canvas) {
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
   camera.position.set(0, 0.22, 7.1);
 
-  const root = new THREE.Group();
-  scene.add(root);
+  const backgroundSpaceGroup = new THREE.Group();
+  scene.add(backgroundSpaceGroup);
+
+  const earthSystem = new THREE.Group();
+  scene.add(earthSystem);
 
   const fallbackEarthTexture = createEarthTexture(THREE);
   const bumpTexture = createBumpTexture(THREE);
@@ -739,10 +888,10 @@ function createEarthEngine(THREE, canvas) {
       emissiveIntensity: 0.32,
     }),
   );
-  root.add(globe);
+  earthSystem.add(globe);
 
   const cityLights = createCityLights(THREE);
-  root.add(cityLights);
+  earthSystem.add(cityLights);
 
   const clouds = new THREE.Mesh(
     new THREE.SphereGeometry(2.045, 128, 128),
@@ -754,7 +903,7 @@ function createEarthEngine(THREE, canvas) {
       depthWrite: false,
     }),
   );
-  root.add(clouds);
+  earthSystem.add(clouds);
 
   const atmosphere = new THREE.Mesh(
     new THREE.SphereGeometry(2.16, 128, 128),
@@ -766,21 +915,21 @@ function createEarthEngine(THREE, canvas) {
       side: THREE.BackSide,
     }),
   );
-  root.add(atmosphere);
+  earthSystem.add(atmosphere);
 
   const gridOverlay = createGrid(THREE);
-  root.add(gridOverlay);
+  earthSystem.add(gridOverlay);
   const coastlineOverlay = createCoastlineOverlay(THREE);
-  root.add(coastlineOverlay);
+  earthSystem.add(coastlineOverlay);
   const terrainOverlay = createSurfaceModeOverlay(THREE, 0xb88f59, 0.0);
   const bathymetryOverlay = createSurfaceModeOverlay(THREE, 0x064b7c, 0.0);
-  root.add(terrainOverlay);
-  root.add(bathymetryOverlay);
-  scene.add(createStars(THREE));
-  scene.add(createSunGlow(THREE));
+  earthSystem.add(terrainOverlay);
+  earthSystem.add(bathymetryOverlay);
+  backgroundSpaceGroup.add(createStars(THREE));
+  backgroundSpaceGroup.add(createSunGlow(THREE));
 
   const hazardRoot = new THREE.Group();
-  root.add(hazardRoot);
+  earthSystem.add(hazardRoot);
 
   const layers = {
     weather: new THREE.Group(),
@@ -790,6 +939,7 @@ function createEarthEngine(THREE, canvas) {
     pollution: new THREE.Group(),
     infrastructure: new THREE.Group(),
     live: new THREE.Group(),
+    selection: new THREE.Group(),
   };
   Object.values(layers).forEach((layer) => hazardRoot.add(layer));
 
@@ -808,8 +958,11 @@ function createEarthEngine(THREE, canvas) {
   let viewMode = "cinematic";
   let activeWildfireModel = null;
   let overlayOpacity = Number(ui.overlayOpacity.value) / 100;
+  let layerEmphasis = scenarioLayerEmphasis("Hurricane");
+  let orbitAngle = 0;
   const clock = new THREE.Clock();
   loadPremiumEarthTextures(THREE, globe, clouds, cityLights);
+  installAnchoringDebug({ THREE, earthSystem, globe, hazardRoot, layers });
 
   function resize() {
     const width = window.innerWidth;
@@ -819,19 +972,24 @@ function createEarthEngine(THREE, canvas) {
     camera.updateProjectionMatrix();
   }
 
-  function focusScenario(scenario, visibility) {
-    targetRotation = rotationForLatLon(scenario.camera.lat, scenario.camera.lon);
-    camera.position.z = scenario.camera.zoom;
+  function focusScenario(scenario, visibility, options = {}) {
+    if (options.follow !== false) {
+      targetRotation = rotationForLatLon(scenario.camera.lat, scenario.camera.lon);
+      camera.position.z = scenario.camera.zoom;
+    }
+    layerEmphasis = scenarioLayerEmphasis(scenario.label);
     rebuildHazards(scenario);
     setLayerVisibility(visibility);
     setViewMode(viewMode);
+    setOverlayOpacity(overlayOpacity);
   }
 
   function rebuildHazards(scenario) {
-    ["weather", "fire", "quake", "flood", "pollution", "infrastructure"].forEach((key) => {
+    ["weather", "fire", "quake", "flood", "pollution", "infrastructure", "selection"].forEach((key) => {
       clearGroup(layers[key]);
     });
     const [lat, lon] = scenario.location;
+    createSelectedRegionMarker(THREE, layers.selection, scenario);
     createWindField(THREE, layers.weather, lat, lon, scenario.accent, scenario.field.swirl);
     if (scenario.label === "Wildfire" && activeWildfireModel) {
       createOperationalFireField(THREE, layers.fire, activeWildfireModel);
@@ -850,8 +1008,11 @@ function createEarthEngine(THREE, canvas) {
     Object.entries(visibility).forEach(([key, value]) => {
       if (layers[key]) {
         layers[key].visible = value;
+        setLayerOpacity(layers[key], overlayOpacity * (layerEmphasis[key] ?? 0.25));
       }
     });
+    layers.selection.visible = true;
+    setLayerOpacity(layers.selection, overlayOpacity);
   }
 
   function setEarthLayers(nextLayers) {
@@ -875,7 +1036,9 @@ function createEarthEngine(THREE, canvas) {
       layer.traverse((child) => {
         if (child.material?.transparent) {
           child.material.userData.baseOpacity ??= child.material.opacity;
-          child.material.opacity = child.material.userData.baseOpacity * overlayOpacity;
+          const layerKey = Object.entries(layers).find(([, value]) => value === layer)?.[0];
+          const emphasis = layerKey === "selection" ? 1 : layerEmphasis[layerKey] ?? 0.25;
+          child.material.opacity = child.material.userData.baseOpacity * overlayOpacity * emphasis;
         }
       });
     });
@@ -918,21 +1081,18 @@ function createEarthEngine(THREE, canvas) {
     requestAnimationFrame(animate);
     const elapsed = clock.getElapsedTime();
     const dt = Math.max(0.6, speed);
-    root.rotation.x += (targetRotation.x - root.rotation.x) * 0.034;
-    root.rotation.y += (targetRotation.y - root.rotation.y) * 0.034;
-    root.rotation.z = Math.sin(elapsed * 0.08) * 0.02;
     if (autoRotate) {
-      globe.rotation.y += 0.00055 * dt;
-      clouds.rotation.y += 0.0014 * dt;
-      cityLights.rotation.y += 0.00055 * dt;
-      terrainOverlay.rotation.y += 0.00055 * dt;
-      bathymetryOverlay.rotation.y += 0.00055 * dt;
+      orbitAngle += 0.00055 * dt;
     }
+    earthSystem.rotation.x += (targetRotation.x - earthSystem.rotation.x) * 0.034;
+    earthSystem.rotation.y += (targetRotation.y + orbitAngle - earthSystem.rotation.y) * 0.034;
+    earthSystem.rotation.z = Math.sin(elapsed * 0.08) * 0.02;
 
     layers.weather.children.forEach((item, index) => {
       item.rotation.z += (0.006 + index * 0.00035) * dt;
       if (item.material) {
-        item.material.opacity = 0.24 + Math.sin(elapsed * 2 + index) * 0.1;
+        item.material.opacity =
+          (0.24 + Math.sin(elapsed * 2 + index) * 0.1) * overlayOpacity * (layerEmphasis.weather ?? 1);
       }
     });
 
@@ -944,12 +1104,14 @@ function createEarthEngine(THREE, canvas) {
     layers.quake.children.forEach((ring, index) => {
       const wave = ((elapsed * 0.3 * dt + index * 0.2) % 1) + 0.22;
       ring.scale.setScalar(wave);
-      ring.material.opacity = Math.max(0, 0.62 - wave * 0.42);
+      ring.material.opacity = Math.max(0, 0.62 - wave * 0.42) * overlayOpacity * (layerEmphasis.quake ?? 1);
     });
 
     layers.pollution.children.forEach((puff, index) => {
+      if (!puff.userData.drift) return;
       puff.position.addScaledVector(puff.userData.drift, 0.0048 * dt);
-      puff.material.opacity = 0.1 + Math.sin(elapsed + index) * 0.035;
+      puff.material.opacity =
+        (0.1 + Math.sin(elapsed + index) * 0.035) * overlayOpacity * (layerEmphasis.pollution ?? 1);
       if (puff.position.length() > 2.48) {
         puff.position.copy(puff.userData.origin);
       }
@@ -981,6 +1143,78 @@ function createEarthEngine(THREE, canvas) {
     setEarthLayers,
     setOverlayOpacity,
   };
+}
+
+function scenarioLayerEmphasis(label) {
+  const dim = 0.18;
+  const base = {
+    weather: dim,
+    fire: dim,
+    quake: dim,
+    flood: dim,
+    pollution: dim,
+    infrastructure: 0.42,
+    live: 0.72,
+  };
+  if (label === "Hurricane") {
+    return { ...base, weather: 1, flood: 0.86, infrastructure: 0.55, live: 0.78 };
+  }
+  if (label === "Wildfire") {
+    return { ...base, fire: 1, pollution: 0.9, weather: 0.62, infrastructure: 0.5, live: 0.7 };
+  }
+  if (label === "Earthquake") {
+    return { ...base, quake: 1, flood: 0.42, infrastructure: 0.55, live: 0.9 };
+  }
+  if (label === "Heatwave") {
+    return { ...base, fire: 0.78, pollution: 0.56, infrastructure: 0.58, weather: 0.35, live: 0.64 };
+  }
+  return base;
+}
+
+function setLayerOpacity(group, multiplier) {
+  group.traverse((child) => {
+    if (child.material?.transparent) {
+      child.material.userData.baseOpacity ??= child.material.opacity;
+      child.material.opacity = child.material.userData.baseOpacity * multiplier;
+    }
+  });
+}
+
+function installAnchoringDebug({ earthSystem, globe, hazardRoot, layers }) {
+  window.gaiaScopeAnchoringDebug = () => {
+    earthSystem.updateMatrixWorld(true);
+    const floridaLocal = latLonToVector3(27.7, -81.7, 2.31);
+    const californiaLocal = latLonToVector3(39.2, -121.1, 2.31);
+    const japanLocal = latLonToVector3(38.3, 142.4, 2.31);
+    const toPlain = (vector) => ({
+      x: Number(vector.x.toFixed(3)),
+      y: Number(vector.y.toFixed(3)),
+      z: Number(vector.z.toFixed(3)),
+    });
+
+    return {
+      hierarchy: {
+        globeParentIsEarthSystem: globe.parent === earthSystem,
+        hazardRootParentIsEarthSystem: hazardRoot.parent === earthSystem,
+        layerParentsAreHazardRoot: Object.fromEntries(
+          Object.entries(layers).map(([key, layer]) => [key, layer.parent === hazardRoot]),
+        ),
+      },
+      earthRotation: {
+        x: Number(earthSystem.rotation.x.toFixed(4)),
+        y: Number(earthSystem.rotation.y.toFixed(4)),
+        z: Number(earthSystem.rotation.z.toFixed(4)),
+      },
+      sampleAnchors: {
+        floridaWorld: toPlain(earthSystem.localToWorld(floridaLocal.clone())),
+        californiaWorld: toPlain(earthSystem.localToWorld(californiaLocal.clone())),
+        japanWorld: toPlain(earthSystem.localToWorld(japanLocal.clone())),
+      },
+      note:
+        "Run this while Orbit is enabled. Sample world positions should change as earthSystem rotates, while every hazard layer remains parented under hazardRoot.",
+    };
+  };
+  console.info("GaiaScope anchoring debug ready: run window.gaiaScopeAnchoringDebug()");
 }
 
 function createGrid(THREE) {
@@ -1249,6 +1483,76 @@ function createInfrastructure(THREE, group, lat, lon, accent) {
     node.position.copy(latLonToVector3(lat + (Math.random() - 0.5) * 5.8, lon + (Math.random() - 0.5) * 5.8, 2.24));
     group.add(node);
   }
+}
+
+function createSelectedRegionMarker(THREE, group, scenario) {
+  const [lat, lon] = scenario.location;
+  const normal = latLonToVector3(lat, lon, 1).normalize();
+  const position = latLonToVector3(lat, lon, 2.31);
+  const ringMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(scenario.accent),
+    transparent: true,
+    opacity: 0.88,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.08, 0.105, 72), ringMaterial);
+  ring.position.copy(position);
+  ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+  group.add(ring);
+
+  const pin = new THREE.Mesh(
+    new THREE.SphereGeometry(0.044, 18, 18),
+    new THREE.MeshBasicMaterial({
+      color: new THREE.Color(scenario.accent),
+      transparent: true,
+      opacity: 0.96,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  pin.position.copy(latLonToVector3(lat, lon, 2.36));
+  group.add(pin);
+
+  const label = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: createLabelTexture(THREE, `${scenario.label}: ${scenario.region}`),
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+    }),
+  );
+  label.position.copy(latLonToVector3(lat + 2.2, lon + 2.4, 2.58));
+  label.scale.set(0.95, 0.23, 1);
+  group.add(label);
+}
+
+function createLabelTexture(THREE, text) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "rgba(4, 14, 24, 0.78)";
+  roundRect(ctx, 14, 22, 484, 72, 18);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(144, 218, 255, 0.45)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = "#eef7ff";
+  ctx.font = "700 31px Segoe UI, Inter, sans-serif";
+  ctx.fillText(text, 34, 69);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function roundRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + width, y, x + width, y + height, radius);
+  ctx.arcTo(x + width, y + height, x, y + height, radius);
+  ctx.arcTo(x, y + height, x, y, radius);
+  ctx.arcTo(x, y, x + width, y, radius);
+  ctx.closePath();
 }
 
 function createLiveEventMarker(THREE, group, event) {

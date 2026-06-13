@@ -46,6 +46,15 @@
         <button type="button" data-view="response">Response</button>
       </nav>
 
+      <section class="mission-panel" aria-label="What GaiaScope does">
+        <p>
+          GaiaScope is an interactive Earth risk engine. Select a disaster scenario, zoom to the affected region,
+          inspect live/fallback data sources, and see simplified physics-based risk overlays.
+        </p>
+        <button id="whatSeeingButton" type="button">What am I seeing?</button>
+        <div id="whatSeeingText" class="what-seeing-text" hidden></div>
+      </section>
+
       <aside class="panel earth-panel" aria-label="Global Earth layers">
         <div class="panel-title">
           <span>Earth stack</span>
@@ -131,6 +140,7 @@
           <label><input type="checkbox" data-layer="infrastructure" checked /> Assets</label>
           <label><input type="checkbox" data-layer="live" checked /> Live</label>
           <label><input id="autoRotate" type="checkbox" checked /> Orbit</label>
+          <label><input id="followRegion" type="checkbox" checked /> Follow region</label>
         </div>
       </aside>
 
@@ -195,9 +205,9 @@
         <div id="impactTimeline" class="impact-timeline"></div>
       </section>
 
-      <section class="panel confidence-panel" aria-label="Wildfire model confidence">
+      <section class="panel confidence-panel" aria-label="Scenario model diagnostics">
         <div class="panel-title">
-          <span>Wildfire model confidence</span>
+          <span id="scenarioModelTitle">Scenario model diagnostics</span>
           <strong id="confidenceScore">--</strong>
         </div>
         <div id="sourceModeBanner" class="source-mode-banner is-neutral">
@@ -217,6 +227,16 @@
           <div id="wildfireAudit" class="audit-grid"></div>
         </div>
       </section>
+
+      <aside class="legend-panel" aria-label="Layer legend">
+        <strong>Layer legend</strong>
+        <span><i class="legend-cyan"></i> blue/cyan = wind/weather</span>
+        <span><i class="legend-fire"></i> orange/red = fire/heat</span>
+        <span><i class="legend-quake"></i> yellow = seismic/quake</span>
+        <span><i class="legend-smoke"></i> gray/white = smoke/clouds</span>
+        <span><i class="legend-risk"></i> green/yellow/red = risk level</span>
+        <span><i class="legend-live"></i> pulsing = live, faded = simulated/fallback</span>
+      </aside>
 
       <section class="telemetry-strip" aria-label="Simulation telemetry">
         <article>
