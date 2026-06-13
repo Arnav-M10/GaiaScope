@@ -4,76 +4,120 @@ const scenarios = {
   hurricane: {
     label: "Hurricane",
     region: "Florida coast",
+    brief:
+      "Cyclone envelope couples wind stress, pressure deficit, rainfall loading, storm surge, and critical-facility exposure.",
     accent: "#54d8ff",
     location: [27.7, -81.7],
-    camera: { lat: 24, lon: -72, zoom: 4.7 },
+    camera: { lat: 23, lon: -76, zoom: 4.55 },
     score: 82,
+    telemetryLabels: ["Wind", "Moisture", "Exposure", "Uncertainty"],
     telemetry: ["64 kt", "82%", "1.8M", "+/-14%"],
+    factors: { forcing: 0.86, exposure: 0.78, vulnerability: 0.66, confidence: 0.73 },
+    diagnostics: { residual: 0.18, cfl: 0.42, diffusion: 0.018, vorticity: 0.77 },
+    field: { source: 0.88, advectionX: 0.9, advectionY: -0.15, diffusion: 0.055, swirl: 0.9 },
+    timeline: [
+      ["0-2h", 0.48, "bands arrive"],
+      ["3-6h", 0.78, "surge peak"],
+      ["7-12h", 0.64, "inland flood"],
+    ],
     equations: [
-      "du/dt = -grad(p)/rho + nu laplacian(u) + Coriolis",
-      "surge = tide + wind stress + pressure setup",
-      "risk = P(flood) x exposure x criticality",
+      "du/dt = -grad(p)/rho + nu laplacian(u) + f x u",
+      "eta_t + div(Hu) = rainfall + surge_boundary",
+      "risk = P(flood | ensemble) x exposure x criticality",
     ],
     explanations: [
-      "Cyclonic wind vectors are tightening around a low-pressure core east of the coast.",
-      "Storm surge rises where onshore wind stress aligns with shallow coastal bathymetry.",
-      "Hospitals, substations, and evacuation roads sit inside the six-hour flood envelope.",
+      "Cyclonic wind vectors tighten around a low-pressure core east of the coast.",
+      "Onshore wind stress and shallow bathymetry amplify the coastal surge surface.",
+      "Hospitals, substations, and evacuation roads intersect the six-hour flood envelope.",
     ],
   },
   wildfire: {
     label: "Wildfire",
     region: "Northern California",
+    brief:
+      "Fire spread model blends heat transfer, wind-driven advection, slope acceleration, fuel dryness, and smoke dispersion.",
     accent: "#ff8a3d",
     location: [39.2, -121.1],
-    camera: { lat: 37, lon: -115, zoom: 4.4 },
+    camera: { lat: 37, lon: -118, zoom: 4.35 },
     score: 76,
+    telemetryLabels: ["Wind", "Humidity", "Population", "Uncertainty"],
     telemetry: ["28 mph", "18%", "420k", "+/-19%"],
+    factors: { forcing: 0.74, exposure: 0.58, vulnerability: 0.71, confidence: 0.64 },
+    diagnostics: { residual: 0.24, cfl: 0.57, diffusion: 0.026, vorticity: 0.52 },
+    field: { source: 0.95, advectionX: 0.78, advectionY: 0.22, diffusion: 0.04, swirl: 0.35 },
+    timeline: [
+      ["0-1h", 0.55, "ignition growth"],
+      ["2-4h", 0.82, "wind run"],
+      ["5-8h", 0.68, "smoke basin"],
+    ],
     equations: [
-      "spread = R0 x wind_factor x slope_factor x fuel_dryness",
-      "dT/dt = alpha laplacian(T) + combustion - cooling",
-      "dC/dt + u dot grad(C) = D laplacian(C) + source",
+      "R = R0 x wind_factor x slope_factor x fuel_dryness",
+      "dT/dt = alpha laplacian(T) + Q_combustion - Q_loss",
+      "dC/dt + u dot grad(C) = D laplacian(C) + fire_source",
     ],
     explanations: [
-      "Active thermal detections are clustered along dry fuel with low overnight humidity.",
-      "Terrain slope and wind advection bias the spread cone toward nearby communities.",
-      "Smoke concentration increases downwind as particles diffuse through the valley.",
+      "Thermal detections cluster over dry fuel with low overnight humidity recovery.",
+      "Terrain slope and wind advection tilt the spread cone toward nearby towns.",
+      "Smoke concentration rises downwind as particles diffuse through the valley.",
     ],
   },
   earthquake: {
     label: "Earthquake",
     region: "Japan trench",
+    brief:
+      "Seismic module maps magnitude-energy release, depth, attenuation, shaking intensity, tsunami screening, and asset fragility.",
     accent: "#ffd166",
     location: [38.3, 142.4],
-    camera: { lat: 36, lon: 140, zoom: 4.35 },
+    camera: { lat: 35, lon: 139, zoom: 4.25 },
     score: 88,
+    telemetryLabels: ["Magnitude", "PGA", "Population", "Uncertainty"],
     telemetry: ["M7.1", "0.32g", "6.4M", "+/-11%"],
+    factors: { forcing: 0.91, exposure: 0.83, vulnerability: 0.77, confidence: 0.81 },
+    diagnostics: { residual: 0.15, cfl: 0.39, diffusion: 0.009, vorticity: 0.18 },
+    field: { source: 0.9, advectionX: 0.05, advectionY: 0.02, diffusion: 0.025, swirl: 0.05 },
+    timeline: [
+      ["0-1m", 0.88, "P-wave"],
+      ["2-5m", 0.94, "S-wave"],
+      ["6-30m", 0.58, "coastal screen"],
+    ],
     equations: [
-      "energy = 10^(1.5M + 4.8)",
-      "I(r) = I0 exp(-k r) / sqrt(r)",
-      "risk = shaking x vulnerability x population_density",
+      "E = 10^(1.5M + 4.8)",
+      "I(r,z) = I0 exp(-k r) / sqrt(r^2 + z^2)",
+      "risk = shaking x fragility x population_density",
     ],
     explanations: [
       "The epicenter releases high seismic energy near dense coastal infrastructure.",
-      "Modeled wavefronts attenuate inland but remain strong across several urban corridors.",
-      "Coastal exposure is elevated enough to keep tsunami screening active.",
+      "Modeled wavefronts attenuate inland but remain strong across urban corridors.",
+      "Coastal exposure is high enough to keep tsunami screening active.",
     ],
   },
   heatwave: {
     label: "Heatwave",
     region: "Dallas metro",
+    brief:
+      "Urban heat solver couples solar loading, impervious cover, tree canopy gaps, boundary-layer stagnation, and air-quality stress.",
     accent: "#ff5f6d",
     location: [32.8, -96.8],
-    camera: { lat: 31, lon: -93, zoom: 4.6 },
+    camera: { lat: 31, lon: -94, zoom: 4.5 },
     score: 69,
+    telemetryLabels: ["Heat index", "Canopy gap", "Population", "Uncertainty"],
     telemetry: ["109 F", "41%", "2.2M", "+/-16%"],
+    factors: { forcing: 0.68, exposure: 0.82, vulnerability: 0.74, confidence: 0.61 },
+    diagnostics: { residual: 0.21, cfl: 0.31, diffusion: 0.033, vorticity: 0.29 },
+    field: { source: 0.76, advectionX: 0.18, advectionY: -0.08, diffusion: 0.065, swirl: 0.14 },
+    timeline: [
+      ["10a", 0.46, "ramp"],
+      ["2p", 0.79, "peak heat"],
+      ["8p", 0.62, "slow cooling"],
+    ],
     equations: [
       "dT/dt = k laplacian(T) + solar_gain - evap_cooling",
-      "AQI = f(PM2.5, O3, NO2, boundary_layer)",
+      "AQI = f(PM2.5, O3, NO2, boundary_layer_height)",
       "risk = heat_index x vulnerability / cooling_access",
     ],
     explanations: [
-      "Urban heat islands intensify where impervious cover and building density are high.",
-      "Low tree cover limits evaporative cooling across several vulnerable census zones.",
+      "Impervious cover and building density intensify urban heat islands.",
+      "Low tree canopy limits evaporative cooling across vulnerable zones.",
       "Air-quality stress compounds the heat index during stagnant afternoon flow.",
     ],
   },
@@ -86,6 +130,7 @@ const enabledLayers = {
   flood: true,
   pollution: true,
   infrastructure: true,
+  live: true,
 };
 
 const ui = {
@@ -93,12 +138,33 @@ const ui = {
   fallback: document.querySelector("#fallback"),
   scenarioList: document.querySelector("#scenarioList"),
   scenarioRegion: document.querySelector("#scenarioRegion"),
+  scenarioBrief: document.querySelector("#scenarioBrief"),
   riskScore: document.querySelector("#riskScore"),
   riskMeter: document.querySelector("#riskMeter"),
+  factorGrid: document.querySelector("#factorGrid"),
   explainList: document.querySelector("#explainList"),
   equationStack: document.querySelector("#equationStack"),
+  impactTimeline: document.querySelector("#impactTimeline"),
   horizon: document.querySelector("#timeHorizon"),
   horizonValue: document.querySelector("#horizonValue"),
+  blend: document.querySelector("#assimilationBlend"),
+  blendValue: document.querySelector("#blendValue"),
+  speed: document.querySelector("#simSpeed"),
+  speedValue: document.querySelector("#speedValue"),
+  autoRotate: document.querySelector("#autoRotate"),
+  solverMode: document.querySelector("#solverMode"),
+  ensembleCount: document.querySelector("#ensembleCount"),
+  assimilationValue: document.querySelector("#assimilationValue"),
+  modelResidual: document.querySelector("#modelResidual"),
+  cflValue: document.querySelector("#cflValue"),
+  diffusionValue: document.querySelector("#diffusionValue"),
+  vorticityValue: document.querySelector("#vorticityValue"),
+  telemetryLabels: [
+    document.querySelector("#telemetryLabel0"),
+    document.querySelector("#telemetryLabel1"),
+    document.querySelector("#telemetryLabel2"),
+    document.querySelector("#telemetryLabel3"),
+  ],
   telemetry: [
     document.querySelector("#windTelemetry"),
     document.querySelector("#moistureTelemetry"),
@@ -108,10 +174,15 @@ const ui = {
   feedStatus: document.querySelector("#feedStatus"),
   liveEventList: document.querySelector("#liveEventList"),
   refreshFeeds: document.querySelector("#refreshFeeds"),
+  lastUpdated: document.querySelector("#lastUpdated"),
+  fieldCanvas: document.querySelector("#field-canvas"),
 };
 
 let activeScenario = "hurricane";
+let currentView = "cinematic";
+let livePressure = 0;
 let engine;
+let fieldModel;
 let THREE_NS;
 
 for (const [key, scenario] of Object.entries(scenarios)) {
@@ -132,9 +203,35 @@ document.querySelectorAll("[data-layer]").forEach((checkbox) => {
   });
 });
 
+document.querySelectorAll("[data-view]").forEach((button) => {
+  button.addEventListener("click", () => {
+    currentView = button.dataset.view;
+    document.querySelectorAll("[data-view]").forEach((item) => {
+      item.classList.toggle("is-active", item === button);
+    });
+    engine?.setViewMode(currentView);
+    renderScenario();
+  });
+});
+
 ui.horizon.addEventListener("input", () => {
   ui.horizonValue.textContent = `${ui.horizon.value}h`;
   renderScenario();
+});
+
+ui.blend.addEventListener("input", () => {
+  ui.blendValue.textContent = `${ui.blend.value}%`;
+  ui.assimilationValue.textContent = `${ui.blend.value}%`;
+  renderScenario();
+});
+
+ui.speed.addEventListener("input", () => {
+  ui.speedValue.textContent = `${(Number(ui.speed.value) / 10).toFixed(1)}x`;
+  engine?.setSpeed(Number(ui.speed.value) / 10);
+});
+
+ui.autoRotate.addEventListener("change", () => {
+  engine?.setAutoRotate(ui.autoRotate.checked);
 });
 
 ui.refreshFeeds.addEventListener("click", () => {
@@ -142,12 +239,18 @@ ui.refreshFeeds.addEventListener("click", () => {
 });
 
 async function boot() {
+  fieldModel = createPhysicsField(ui.fieldCanvas);
+  fieldModel.start();
+  renderScenario();
+
   try {
     const THREE = await import(
       "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js"
     );
     THREE_NS = THREE;
     engine = createEarthEngine(THREE, ui.canvas);
+    engine.setSpeed(Number(ui.speed.value) / 10);
+    engine.setAutoRotate(ui.autoRotate.checked);
     setScenario(activeScenario);
     engine.animate();
     refreshLiveFeeds();
@@ -169,7 +272,9 @@ async function refreshLiveFeeds() {
 
   try {
     const liveData = await fetchLiveData();
+    livePressure = calculateLivePressure(liveData.events);
     renderFeedStatus(liveData);
+    renderScenario();
     engine?.setLiveEvents(liveData.events);
   } catch (error) {
     renderFeedStatus({
@@ -188,6 +293,7 @@ function renderFeedStatus(liveData) {
   if (liveData.loading) {
     ui.feedStatus.innerHTML = `<div class="feed-row"><span>Fetching live sources</span><strong>...</strong></div>`;
     ui.liveEventList.innerHTML = `<li>Contacting USGS, NWS, and NOAA CO-OPS.</li>`;
+    ui.lastUpdated.textContent = "Assimilating public feeds...";
     return;
   }
 
@@ -212,7 +318,7 @@ function renderFeedStatus(liveData) {
 
   const events = liveData.events
     .sort((a, b) => b.severity - a.severity)
-    .slice(0, 5)
+    .slice(0, 6)
     .map((event) => `<li>
       <b>${escapeHtml(event.title)}</b>
       <span>${escapeHtml(event.source)} - ${escapeHtml(event.detail)}</span>
@@ -220,31 +326,48 @@ function renderFeedStatus(liveData) {
     .join("");
 
   ui.liveEventList.innerHTML = events || `<li>No live events returned yet.</li>`;
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  ui.lastUpdated.textContent = `Updated ${new Date(liveData.updatedAt).toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  })} - live pressure ${(livePressure * 100).toFixed(0)}%`;
 }
 
 function setScenario(key) {
   activeScenario = key;
   renderScenario();
   engine?.focusScenario(scenarios[key], enabledLayers);
+  fieldModel?.setScenario(scenarios[key]);
 }
 
 function renderScenario() {
   const scenario = scenarios[activeScenario];
   const horizonFactor = Number(ui.horizon.value) / 24;
-  const score = Math.min(96, Math.round(scenario.score + horizonFactor * 8));
+  const blendFactor = Number(ui.blend.value) / 100;
+  const viewBoost = currentView === "physics" ? 2 : currentView === "response" ? -1 : 0;
+  const score = Math.min(
+    99,
+    Math.round(scenario.score + horizonFactor * 8 + livePressure * blendFactor * 11 + viewBoost),
+  );
 
   ui.scenarioRegion.textContent = scenario.region;
+  ui.scenarioBrief.textContent = scenario.brief;
   ui.riskScore.textContent = score;
   ui.riskMeter.style.width = `${score}%`;
+  ui.assimilationValue.textContent = `${ui.blend.value}%`;
+  ui.ensembleCount.textContent = `${Math.round(24 + Number(ui.horizon.value) * 4)} runs`;
+  ui.solverMode.textContent = currentView === "physics" ? "PDE focus" : "Hybrid PDE";
+
+  scenario.telemetryLabels.forEach((label, index) => {
+    ui.telemetryLabels[index].textContent = label;
+  });
+  scenario.telemetry.forEach((value, index) => {
+    ui.telemetry[index].textContent = value;
+  });
+
+  const factors = adjustedFactors(scenario, horizonFactor, blendFactor);
+  ui.factorGrid.innerHTML = Object.entries(factors)
+    .map(([key, value]) => factorRow(key, value))
+    .join("");
 
   ui.explainList.replaceChildren(
     ...scenario.explanations.map((text) => {
@@ -262,18 +385,61 @@ function renderScenario() {
     }),
   );
 
-  scenario.telemetry.forEach((value, index) => {
-    ui.telemetry[index].textContent = value;
-  });
+  ui.impactTimeline.innerHTML = scenario.timeline
+    .map(([time, value, label]) => timelineRow(time, value + horizonFactor * 0.08, label))
+    .join("");
+
+  ui.modelResidual.textContent = `Residual ${scenario.diagnostics.residual.toFixed(2)}`;
+  ui.cflValue.textContent = scenario.diagnostics.cfl.toFixed(2);
+  ui.diffusionValue.textContent = scenario.diagnostics.diffusion.toFixed(3);
+  ui.vorticityValue.textContent = scenario.diagnostics.vorticity.toFixed(2);
 
   document.querySelectorAll(".scenario-button").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.scenario === activeScenario);
   });
 }
 
+function adjustedFactors(scenario, horizonFactor, blendFactor) {
+  return {
+    forcing: clamp(scenario.factors.forcing + horizonFactor * 0.1, 0, 1),
+    exposure: clamp(scenario.factors.exposure + livePressure * blendFactor * 0.14, 0, 1),
+    vulnerability: scenario.factors.vulnerability,
+    confidence: clamp(scenario.factors.confidence + blendFactor * 0.12 - horizonFactor * 0.05, 0, 1),
+  };
+}
+
+function factorRow(label, value) {
+  const pct = Math.round(value * 100);
+  return `<div class="factor-row">
+    <span>${escapeHtml(label)}</span>
+    <div class="factor-track"><span style="--value:${pct}%"></span></div>
+    <strong>${pct}%</strong>
+  </div>`;
+}
+
+function timelineRow(time, value, label) {
+  const pct = Math.round(clamp(value, 0, 1) * 100);
+  return `<div class="timeline-row">
+    <span>${escapeHtml(time)}</span>
+    <div class="timeline-track"><span style="--value:${pct}%"></span></div>
+    <strong>${escapeHtml(label)}</strong>
+  </div>`;
+}
+
+function calculateLivePressure(events) {
+  if (!events.length) {
+    return 0;
+  }
+  const top = events
+    .map((event) => event.severity)
+    .sort((a, b) => b - a)
+    .slice(0, 20);
+  return clamp(top.reduce((sum, value) => sum + value, 0) / Math.max(7, top.length), 0, 1);
+}
+
 function createEarthEngine(THREE, canvas) {
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x03070d, 0.045);
+  scene.fog = new THREE.FogExp2(0x02050a, 0.036);
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -282,30 +448,51 @@ function createEarthEngine(THREE, canvas) {
     powerPreference: "high-performance",
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-  camera.position.set(0, 0.35, 7.4);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+  camera.position.set(0, 0.22, 7.1);
 
   const root = new THREE.Group();
   scene.add(root);
 
+  const earthTexture = createEarthTexture(THREE);
+  const bumpTexture = createBumpTexture(THREE);
   const globe = new THREE.Mesh(
-    new THREE.SphereGeometry(2, 96, 96),
+    new THREE.SphereGeometry(2, 160, 160),
     new THREE.MeshStandardMaterial({
-      color: 0x0a2a3f,
-      roughness: 0.9,
-      metalness: 0.05,
-      emissive: 0x031829,
+      map: earthTexture,
+      bumpMap: bumpTexture,
+      bumpScale: 0.055,
+      roughness: 0.78,
+      metalness: 0.02,
+      emissive: 0x021421,
+      emissiveIntensity: 0.32,
     }),
   );
   root.add(globe);
 
+  const cityLights = createCityLights(THREE);
+  root.add(cityLights);
+
+  const clouds = new THREE.Mesh(
+    new THREE.SphereGeometry(2.045, 128, 128),
+    new THREE.MeshBasicMaterial({
+      map: createCloudTexture(THREE),
+      transparent: true,
+      opacity: 0.21,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  root.add(clouds);
+
   const atmosphere = new THREE.Mesh(
-    new THREE.SphereGeometry(2.035, 96, 96),
+    new THREE.SphereGeometry(2.16, 128, 128),
     new THREE.MeshBasicMaterial({
       color: 0x54d8ff,
       transparent: true,
-      opacity: 0.09,
+      opacity: 0.13,
       blending: THREE.AdditiveBlending,
       side: THREE.BackSide,
     }),
@@ -313,10 +500,8 @@ function createEarthEngine(THREE, canvas) {
   root.add(atmosphere);
 
   root.add(createGrid(THREE));
-  root.add(createProceduralContinents(THREE));
-
-  const stars = createStars(THREE);
-  scene.add(stars);
+  scene.add(createStars(THREE));
+  scene.add(createSunGlow(THREE));
 
   const hazardRoot = new THREE.Group();
   root.add(hazardRoot);
@@ -330,20 +515,21 @@ function createEarthEngine(THREE, canvas) {
     infrastructure: new THREE.Group(),
     live: new THREE.Group(),
   };
-
   Object.values(layers).forEach((layer) => hazardRoot.add(layer));
 
   const lights = [
-    new THREE.AmbientLight(0x86b8ff, 0.65),
-    new THREE.DirectionalLight(0xffffff, 2.2),
-    new THREE.PointLight(0x54d8ff, 34, 12),
+    new THREE.AmbientLight(0x6d94bc, 0.8),
+    new THREE.DirectionalLight(0xffffff, 3.2),
+    new THREE.PointLight(0x54d8ff, 20, 14),
   ];
-  lights[1].position.set(-3, 4, 5);
-  lights[2].position.set(2, 0, 2);
+  lights[1].position.set(-3.8, 2.7, 5.4);
+  lights[2].position.set(2.4, -0.4, 3.2);
   lights.forEach((light) => scene.add(light));
 
   let targetRotation = new THREE.Euler(0, 0, 0);
-  let currentScenario = scenarios.hurricane;
+  let autoRotate = true;
+  let speed = 1.2;
+  let viewMode = "cinematic";
   const clock = new THREE.Clock();
 
   function resize() {
@@ -355,11 +541,11 @@ function createEarthEngine(THREE, canvas) {
   }
 
   function focusScenario(scenario, visibility) {
-    currentScenario = scenario;
     targetRotation = rotationForLatLon(scenario.camera.lat, scenario.camera.lon);
     camera.position.z = scenario.camera.zoom;
     rebuildHazards(scenario);
     setLayerVisibility(visibility);
+    setViewMode(viewMode);
   }
 
   function rebuildHazards(scenario) {
@@ -367,13 +553,13 @@ function createEarthEngine(THREE, canvas) {
       clearGroup(layers[key]);
     });
     const [lat, lon] = scenario.location;
-
-    createWindField(THREE, layers.weather, lat, lon, scenario.accent);
-    createFireField(THREE, layers.fire, lat, lon);
+    createWindField(THREE, layers.weather, lat, lon, scenario.accent, scenario.field.swirl);
+    createFireField(THREE, layers.fire, lat, lon, scenario.accent);
     createSeismicRings(THREE, layers.quake, lat, lon, scenario.accent);
     createFloodField(THREE, layers.flood, lat, lon);
     createSmokePlume(THREE, layers.pollution, lat, lon);
-    createInfrastructure(THREE, layers.infrastructure, lat, lon);
+    createInfrastructure(THREE, layers.infrastructure, lat, lon, scenario.accent);
+    createRiskCone(THREE, layers.weather, lat, lon, scenario.accent);
   }
 
   function setLayerVisibility(visibility) {
@@ -386,48 +572,69 @@ function createEarthEngine(THREE, canvas) {
 
   function setLiveEvents(events) {
     clearGroup(layers.live);
-    events.slice(0, 60).forEach((event) => {
+    events.slice(0, 80).forEach((event) => {
       createLiveEventMarker(THREE, layers.live, event);
     });
+  }
+
+  function setViewMode(mode) {
+    viewMode = mode;
+    layers.infrastructure.visible = enabledLayers.infrastructure && mode !== "cinematic";
+    layers.live.visible = enabledLayers.live;
+    atmosphere.material.opacity = mode === "physics" ? 0.18 : 0.12;
+    cityLights.material.opacity = mode === "response" ? 0.95 : 0.58;
+  }
+
+  function setAutoRotate(value) {
+    autoRotate = value;
+  }
+
+  function setSpeed(value) {
+    speed = value;
   }
 
   function animate() {
     requestAnimationFrame(animate);
     const elapsed = clock.getElapsedTime();
-    root.rotation.x += (targetRotation.x - root.rotation.x) * 0.035;
-    root.rotation.y += (targetRotation.y - root.rotation.y) * 0.035;
-    root.rotation.z = Math.sin(elapsed * 0.08) * 0.025;
-    globe.rotation.y += 0.0008;
-    stars.rotation.y -= 0.0004;
+    const dt = Math.max(0.6, speed);
+    root.rotation.x += (targetRotation.x - root.rotation.x) * 0.034;
+    root.rotation.y += (targetRotation.y - root.rotation.y) * 0.034;
+    root.rotation.z = Math.sin(elapsed * 0.08) * 0.02;
+    if (autoRotate) {
+      globe.rotation.y += 0.00055 * dt;
+      clouds.rotation.y += 0.0014 * dt;
+      cityLights.rotation.y += 0.00055 * dt;
+    }
 
     layers.weather.children.forEach((item, index) => {
-      item.rotation.z += 0.01 + index * 0.0008;
-      item.material.opacity = 0.28 + Math.sin(elapsed * 2 + index) * 0.12;
+      item.rotation.z += (0.006 + index * 0.00035) * dt;
+      if (item.material) {
+        item.material.opacity = 0.24 + Math.sin(elapsed * 2 + index) * 0.1;
+      }
     });
 
     layers.fire.children.forEach((item, index) => {
-      const flicker = 1 + Math.sin(elapsed * 5 + index) * 0.22;
+      const flicker = 1 + Math.sin(elapsed * 6 + index) * 0.24;
       item.scale.setScalar(item.userData.baseScale * flicker);
     });
 
     layers.quake.children.forEach((ring, index) => {
-      const wave = ((elapsed * 0.34 + index * 0.22) % 1) + 0.3;
+      const wave = ((elapsed * 0.3 * dt + index * 0.2) % 1) + 0.22;
       ring.scale.setScalar(wave);
-      ring.material.opacity = Math.max(0, 0.55 - wave * 0.38);
+      ring.material.opacity = Math.max(0, 0.62 - wave * 0.42);
     });
 
     layers.pollution.children.forEach((puff, index) => {
-      puff.position.addScaledVector(puff.userData.drift, 0.006);
-      puff.material.opacity = 0.12 + Math.sin(elapsed + index) * 0.04;
-      if (puff.position.length() > 2.42) {
+      puff.position.addScaledVector(puff.userData.drift, 0.0048 * dt);
+      puff.material.opacity = 0.1 + Math.sin(elapsed + index) * 0.035;
+      if (puff.position.length() > 2.48) {
         puff.position.copy(puff.userData.origin);
       }
     });
 
     layers.live.children.forEach((item, index) => {
       if (item.userData.isLiveMarker) {
-        const pulse = 1 + Math.sin(elapsed * 3 + index) * 0.18;
-        item.scale.setScalar(pulse);
+        item.scale.setScalar(1 + Math.sin(elapsed * 3.2 + index) * 0.2);
       }
     });
 
@@ -437,21 +644,28 @@ function createEarthEngine(THREE, canvas) {
   window.addEventListener("resize", resize);
   resize();
 
-  return { animate, focusScenario, setLayerVisibility, setLiveEvents };
+  return {
+    animate,
+    focusScenario,
+    setLayerVisibility,
+    setLiveEvents,
+    setViewMode,
+    setAutoRotate,
+    setSpeed,
+  };
 }
 
 function createGrid(THREE) {
   const group = new THREE.Group();
   const material = new THREE.LineBasicMaterial({
-    color: 0x497d9f,
+    color: 0x7acdf2,
     transparent: true,
-    opacity: 0.18,
+    opacity: 0.1,
   });
-
-  for (let lat = -60; lat <= 60; lat += 30) {
+  for (let lat = -60; lat <= 60; lat += 15) {
     group.add(makeLatitude(THREE, lat, material));
   }
-  for (let lon = 0; lon < 180; lon += 15) {
+  for (let lon = 0; lon < 180; lon += 10) {
     const meridian = makeMeridian(THREE, material);
     meridian.rotation.y = THREE.MathUtils.degToRad(lon);
     group.add(meridian);
@@ -459,81 +673,54 @@ function createGrid(THREE) {
   return group;
 }
 
-function createProceduralContinents(THREE) {
-  const group = new THREE.Group();
-  const material = new THREE.PointsMaterial({
-    size: 0.014,
-    color: 0x5fd094,
-    transparent: true,
-    opacity: 0.58,
-    depthWrite: false,
-  });
-  const vertices = [];
-
-  for (let i = 0; i < 2600; i += 1) {
-    const lat = -58 + Math.random() * 126;
-    const lon = -180 + Math.random() * 360;
-    const landScore =
-      Math.sin((lon + 24) * 0.045) +
-      Math.cos((lat - 12) * 0.08) +
-      Math.sin((lat + lon) * 0.035);
-    if (landScore > 0.64 || isKnownLandCluster(lat, lon)) {
-      vertices.push(...latLonToVector3(lat, lon, 2.012).toArray());
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
-  group.add(new THREE.Points(geometry, material));
-  return group;
-}
-
-function createStars(THREE) {
-  const vertices = [];
-  for (let i = 0; i < 1600; i += 1) {
-    const radius = 18 + Math.random() * 18;
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(2 * Math.random() - 1);
-    vertices.push(
-      radius * Math.sin(phi) * Math.cos(theta),
-      radius * Math.sin(phi) * Math.sin(theta),
-      radius * Math.cos(phi),
-    );
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
-  return new THREE.Points(
-    geometry,
-    new THREE.PointsMaterial({ color: 0xb8dfff, size: 0.028, opacity: 0.5, transparent: true }),
-  );
-}
-
-function createWindField(THREE, group, lat, lon, accent) {
-  const material = new THREE.LineBasicMaterial({
-    color: new THREE.Color(accent),
-    transparent: true,
-    opacity: 0.38,
-  });
-  for (let i = 0; i < 34; i += 1) {
-    const radius = 0.14 + i * 0.012;
+function createWindField(THREE, group, lat, lon, accent, swirl) {
+  for (let i = 0; i < 44; i += 1) {
+    const material = new THREE.LineBasicMaterial({
+      color: new THREE.Color(accent),
+      transparent: true,
+      opacity: 0.34,
+    });
+    const radius = 0.1 + i * 0.015;
     const points = [];
-    for (let t = 0; t < 60; t += 1) {
-      const angle = t / 7 + i * 0.44;
-      const localLat = lat + Math.sin(angle) * radius * 11;
-      const localLon = lon + Math.cos(angle) * radius * 15;
-      points.push(latLonToVector3(localLat, localLon, 2.08 + i * 0.0008));
+    for (let t = 0; t < 72; t += 1) {
+      const angle = t / 8 + i * 0.4;
+      const shear = Math.sin(t * 0.09 + i) * swirl * 1.4;
+      points.push(
+        latLonToVector3(
+          lat + Math.sin(angle) * radius * 10 + shear,
+          lon + Math.cos(angle) * radius * 15 + i * 0.04,
+          2.08 + i * 0.001,
+        ),
+      );
     }
     const curve = new THREE.CatmullRomCurve3(points);
-    const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(90));
-    group.add(new THREE.Line(geometry, material.clone()));
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(90)), material));
   }
 }
 
-function createFireField(THREE, group, lat, lon) {
-  const colors = [0xff4d2e, 0xff9f1c, 0xffd166];
-  for (let i = 0; i < 22; i += 1) {
+function createRiskCone(THREE, group, lat, lon, accent) {
+  const normal = latLonToVector3(lat, lon, 1).normalize();
+  const cone = new THREE.Mesh(
+    new THREE.CircleGeometry(0.56, 96, 0.2, Math.PI * 1.25),
+    new THREE.MeshBasicMaterial({
+      color: new THREE.Color(accent),
+      transparent: true,
+      opacity: 0.13,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    }),
+  );
+  cone.position.copy(latLonToVector3(lat + 1.1, lon + 0.6, 2.11));
+  cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+  group.add(cone);
+}
+
+function createFireField(THREE, group, lat, lon, accent) {
+  const colors = [0xff4d2e, 0xff9f1c, 0xffd166, new THREE.Color(accent)];
+  for (let i = 0; i < 34; i += 1) {
     const spot = new THREE.Mesh(
-      new THREE.SphereGeometry(0.026 + Math.random() * 0.025, 16, 16),
+      new THREE.SphereGeometry(0.022 + Math.random() * 0.028, 18, 18),
       new THREE.MeshBasicMaterial({
         color: colors[i % colors.length],
         transparent: true,
@@ -541,31 +728,26 @@ function createFireField(THREE, group, lat, lon) {
         blending: THREE.AdditiveBlending,
       }),
     );
-    spot.position.copy(
-      latLonToVector3(
-        lat + (Math.random() - 0.5) * 5.2,
-        lon + (Math.random() - 0.5) * 6.6,
-        2.13,
-      ),
-    );
-    spot.userData.baseScale = 0.75 + Math.random() * 1.8;
+    spot.position.copy(latLonToVector3(lat + (Math.random() - 0.5) * 5.6, lon + (Math.random() - 0.5) * 7, 2.15));
+    spot.userData.baseScale = 0.75 + Math.random() * 1.9;
     group.add(spot);
   }
 }
 
 function createSeismicRings(THREE, group, lat, lon, accent) {
   const normal = latLonToVector3(lat, lon, 1).normalize();
-  const origin = latLonToVector3(lat, lon, 2.16);
-  for (let i = 0; i < 5; i += 1) {
-    const geometry = new THREE.RingGeometry(0.14 + i * 0.08, 0.148 + i * 0.08, 96);
-    const material = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(accent),
-      transparent: true,
-      opacity: 0.45,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-    });
-    const ring = new THREE.Mesh(geometry, material);
+  const origin = latLonToVector3(lat, lon, 2.18);
+  for (let i = 0; i < 7; i += 1) {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.1 + i * 0.075, 0.106 + i * 0.075, 128),
+      new THREE.MeshBasicMaterial({
+        color: new THREE.Color(accent),
+        transparent: true,
+        opacity: 0.48,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
     ring.position.copy(origin);
     ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
     group.add(ring);
@@ -573,70 +755,74 @@ function createSeismicRings(THREE, group, lat, lon, accent) {
 }
 
 function createFloodField(THREE, group, lat, lon) {
-  const normal = latLonToVector3(lat, lon, 1).normalize();
   const material = new THREE.MeshBasicMaterial({
     color: 0x36b8ff,
     transparent: true,
-    opacity: 0.22,
+    opacity: 0.2,
     side: THREE.DoubleSide,
     blending: THREE.AdditiveBlending,
   });
-  for (let i = 0; i < 4; i += 1) {
-    const disc = new THREE.Mesh(new THREE.CircleGeometry(0.22 + i * 0.11, 72), material.clone());
-    disc.position.copy(latLonToVector3(lat + i * 0.55, lon - i * 0.42, 2.105));
+  for (let i = 0; i < 5; i += 1) {
+    const normal = latLonToVector3(lat + i * 0.35, lon - i * 0.3, 1).normalize();
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(0.18 + i * 0.1, 84), material.clone());
+    disc.position.copy(latLonToVector3(lat + i * 0.45, lon - i * 0.38, 2.112));
     disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
     group.add(disc);
   }
 }
 
 function createSmokePlume(THREE, group, lat, lon) {
-  for (let i = 0; i < 26; i += 1) {
+  for (let i = 0; i < 34; i += 1) {
     const puff = new THREE.Mesh(
-      new THREE.SphereGeometry(0.045 + Math.random() * 0.05, 18, 18),
+      new THREE.SphereGeometry(0.035 + Math.random() * 0.055, 18, 18),
       new THREE.MeshBasicMaterial({
-        color: 0xaec5ca,
+        color: 0xb7c7c9,
         transparent: true,
-        opacity: 0.14,
+        opacity: 0.12,
         blending: THREE.AdditiveBlending,
       }),
     );
-    const origin = latLonToVector3(lat + i * 0.12, lon - i * 0.24, 2.18 + i * 0.002);
+    const origin = latLonToVector3(lat + i * 0.11, lon - i * 0.25, 2.18 + i * 0.002);
     puff.position.copy(origin);
     puff.userData.origin = origin.clone();
-    puff.userData.drift = latLonToVector3(lat + 1.2, lon - 2.6, 1).normalize().multiplyScalar(0.9);
+    puff.userData.drift = latLonToVector3(lat + 1.4, lon - 2.8, 1).normalize().multiplyScalar(0.9);
     group.add(puff);
   }
 }
 
-function createInfrastructure(THREE, group, lat, lon) {
-  const material = new THREE.LineBasicMaterial({
+function createInfrastructure(THREE, group, lat, lon, accent) {
+  const roadMaterial = new THREE.LineBasicMaterial({
     color: 0xeef7ff,
     transparent: true,
-    opacity: 0.45,
+    opacity: 0.42,
   });
-  for (let i = -3; i <= 3; i += 1) {
-    const roadA = [
-      latLonToVector3(lat - 3, lon + i * 0.8, 2.19),
-      latLonToVector3(lat + 3, lon + i * 0.8, 2.19),
-    ];
-    const roadB = [
-      latLonToVector3(lat + i * 0.7, lon - 3, 2.19),
-      latLonToVector3(lat + i * 0.7, lon + 3, 2.19),
-    ];
-    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(roadA), material));
-    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(roadB), material.clone()));
+  const nodeMaterial = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(accent),
+    transparent: true,
+    opacity: 0.72,
+    blending: THREE.AdditiveBlending,
+  });
+  for (let i = -4; i <= 4; i += 1) {
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      latLonToVector3(lat - 3.3, lon + i * 0.68, 2.2),
+      latLonToVector3(lat + 3.3, lon + i * 0.68, 2.2),
+    ]), roadMaterial));
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      latLonToVector3(lat + i * 0.6, lon - 3.3, 2.2),
+      latLonToVector3(lat + i * 0.6, lon + 3.3, 2.2),
+    ]), roadMaterial.clone()));
+  }
+  for (let i = 0; i < 16; i += 1) {
+    const node = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.045, 0.045), nodeMaterial);
+    node.position.copy(latLonToVector3(lat + (Math.random() - 0.5) * 5.8, lon + (Math.random() - 0.5) * 5.8, 2.24));
+    group.add(node);
   }
 }
 
 function createLiveEventMarker(THREE, group, event) {
-  const color = {
-    quake: 0xffd166,
-    weather: 0x54d8ff,
-    flood: 0x36b8ff,
-  }[event.kind] ?? 0xffffff;
-  const radius = 0.035 + event.severity * 0.08;
+  const color = { quake: 0xffd166, weather: 0x54d8ff, flood: 0x36b8ff }[event.kind] ?? 0xffffff;
   const marker = new THREE.Mesh(
-    new THREE.SphereGeometry(radius, 18, 18),
+    new THREE.SphereGeometry(0.03 + event.severity * 0.07, 20, 20),
     new THREE.MeshBasicMaterial({
       color,
       transparent: true,
@@ -644,30 +830,232 @@ function createLiveEventMarker(THREE, group, event) {
       blending: THREE.AdditiveBlending,
     }),
   );
-  marker.position.copy(latLonToVector3(event.lat, event.lon, 2.25));
-  marker.userData.baseScale = 1;
+  marker.position.copy(latLonToVector3(event.lat, event.lon, 2.27));
   marker.userData.isLiveMarker = true;
   group.add(marker);
-
   if (event.kind === "quake") {
     createSeismicRings(THREE, group, event.lat, event.lon, "#ffd166");
   }
 }
 
+function createStars(THREE) {
+  const vertices = [];
+  for (let i = 0; i < 2400; i += 1) {
+    const radius = 18 + Math.random() * 22;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    vertices.push(radius * Math.sin(phi) * Math.cos(theta), radius * Math.sin(phi) * Math.sin(theta), radius * Math.cos(phi));
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  return new THREE.Points(
+    geometry,
+    new THREE.PointsMaterial({ color: 0xb8dfff, size: 0.026, opacity: 0.58, transparent: true }),
+  );
+}
+
+function createSunGlow(THREE) {
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 32, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0xffd166,
+      transparent: true,
+      opacity: 0.48,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  glow.position.set(-5.6, 2.2, -3.6);
+  return glow;
+}
+
+function createCityLights(THREE) {
+  const vertices = [];
+  const clusters = [
+    [40.7, -74], [34.0, -118.2], [29.7, -95.3], [51.5, -0.1], [48.8, 2.3],
+    [35.7, 139.7], [19.4, -99.1], [28.6, 77.2], [31.2, 121.5], [-23.5, -46.6],
+  ];
+  clusters.forEach(([lat, lon]) => {
+    for (let i = 0; i < 42; i += 1) {
+      vertices.push(...latLonToVector3(lat + (Math.random() - 0.5) * 5, lon + (Math.random() - 0.5) * 7, 2.032).toArray());
+    }
+  });
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  return new THREE.Points(
+    geometry,
+    new THREE.PointsMaterial({
+      color: 0xffdf85,
+      size: 0.018,
+      transparent: true,
+      opacity: 0.58,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+}
+
+function createEarthTexture(THREE) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext("2d");
+  const ocean = ctx.createLinearGradient(0, 0, 1024, 512);
+  ocean.addColorStop(0, "#09233f");
+  ocean.addColorStop(0.55, "#0b4d78");
+  ocean.addColorStop(1, "#2aa5e8");
+  ctx.fillStyle = ocean;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let i = 0; i < 260; i += 1) {
+    const lon = -180 + Math.random() * 360;
+    const lat = -65 + Math.random() * 135;
+    if (!isKnownLandCluster(lat, lon) && Math.random() > 0.22) continue;
+    const x = ((lon + 180) / 360) * canvas.width;
+    const y = ((90 - lat) / 180) * canvas.height;
+    const r = 12 + Math.random() * 42;
+    ctx.fillStyle = Math.random() > 0.45 ? "rgba(55, 142, 104, 0.72)" : "rgba(98, 125, 87, 0.62)";
+    ctx.beginPath();
+    ctx.ellipse(x, y, r * (0.8 + Math.random()), r * (0.35 + Math.random() * 0.65), Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = "rgba(232, 244, 255, 0.78)";
+  ctx.fillRect(0, 0, canvas.width, 28);
+  ctx.fillRect(0, canvas.height - 34, canvas.width, 34);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createBumpTexture(THREE) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#777";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < 1400; i += 1) {
+    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.16})`;
+    ctx.fillRect(Math.random() * canvas.width, Math.random() * canvas.height, 1 + Math.random() * 3, 1 + Math.random() * 3);
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
+function createCloudTexture(THREE) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < 420; i += 1) {
+    const x = Math.random() * canvas.width;
+    const y = Math.random() * canvas.height;
+    const r = 8 + Math.random() * 42;
+    const gradient = ctx.createRadialGradient(x, y, 1, x, y, r);
+    gradient.addColorStop(0, "rgba(255,255,255,0.48)");
+    gradient.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
 function makeLatitude(THREE, lat, material) {
   const points = [];
-  for (let lon = -180; lon <= 180; lon += 3) {
-    points.push(latLonToVector3(lat, lon, 2.018));
-  }
+  for (let lon = -180; lon <= 180; lon += 3) points.push(latLonToVector3(lat, lon, 2.02));
   return new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material);
 }
 
 function makeMeridian(THREE, material) {
   const points = [];
-  for (let lat = -90; lat <= 90; lat += 3) {
-    points.push(latLonToVector3(lat, 0, 2.018));
-  }
+  for (let lat = -90; lat <= 90; lat += 3) points.push(latLonToVector3(lat, 0, 2.02));
   return new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), material.clone());
+}
+
+function createPhysicsField(canvas) {
+  const ctx = canvas.getContext("2d");
+  const width = 112;
+  const height = 64;
+  let current = new Float32Array(width * height);
+  let next = new Float32Array(width * height);
+  let scenario = scenarios.hurricane;
+  let tick = 0;
+  const offscreen = document.createElement("canvas");
+  offscreen.width = width;
+  offscreen.height = height;
+  const offscreenContext = offscreen.getContext("2d");
+
+  function setScenario(nextScenario) {
+    scenario = nextScenario;
+    current.fill(0);
+    seed();
+  }
+
+  function seed() {
+    const cx = Math.floor(width * 0.38);
+    const cy = Math.floor(height * 0.5);
+    for (let y = -6; y <= 6; y += 1) {
+      for (let x = -6; x <= 6; x += 1) {
+        const dist = Math.sqrt(x * x + y * y);
+        if (dist < 6) current[(cy + y) * width + cx + x] = scenario.field.source * (1 - dist / 7);
+      }
+    }
+  }
+
+  function step() {
+    tick += 1;
+    const params = scenario.field;
+    const sx = Math.floor(width * (0.28 + Math.sin(tick * 0.025) * 0.04));
+    const sy = Math.floor(height * (0.5 + Math.cos(tick * 0.018) * 0.09));
+    current[sy * width + sx] = Math.min(1, current[sy * width + sx] + params.source * 0.18);
+
+    for (let y = 1; y < height - 1; y += 1) {
+      for (let x = 1; x < width - 1; x += 1) {
+        const i = y * width + x;
+        const lap = current[i - 1] + current[i + 1] + current[i - width] + current[i + width] - current[i] * 4;
+        const advX = params.advectionX * (current[i] - current[i - 1]);
+        const advY = params.advectionY * (current[i] - current[i - width]);
+        const curl = Math.sin((x - y + tick) * 0.04) * params.swirl * 0.004;
+        next[i] = clamp(current[i] + params.diffusion * lap - 0.035 * advX - 0.035 * advY + curl, 0, 1) * 0.992;
+      }
+    }
+    [current, next] = [next, current];
+  }
+
+  function draw() {
+    const image = ctx.createImageData(width, height);
+    for (let i = 0; i < current.length; i += 1) {
+      const value = current[i];
+      const p = i * 4;
+      image.data[p] = Math.round(20 + value * 245);
+      image.data[p + 1] = Math.round(80 + Math.sin(value * Math.PI) * 160);
+      image.data[p + 2] = Math.round(120 + (1 - value) * 120);
+      image.data[p + 3] = 255;
+    }
+    offscreenContext.putImageData(image, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(offscreen, 0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = "rgba(166,243,255,0.35)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 32) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x + Math.sin((tick + x) * 0.02) * 16, canvas.height);
+      ctx.stroke();
+    }
+  }
+
+  function loop() {
+    for (let i = 0; i < 3; i += 1) step();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  function start() {
+    seed();
+    loop();
+  }
+
+  return { start, setScenario };
 }
 
 function rotationForLatLon(lat, lon) {
@@ -692,11 +1080,8 @@ function clearGroup(group) {
   while (group.children.length > 0) {
     const child = group.children.pop();
     child.geometry?.dispose();
-    if (Array.isArray(child.material)) {
-      child.material.forEach((material) => material.dispose());
-    } else {
-      child.material?.dispose();
-    }
+    if (Array.isArray(child.material)) child.material.forEach((material) => material.dispose());
+    else child.material?.dispose();
   }
 }
 
@@ -708,10 +1093,25 @@ function isKnownLandCluster(lat, lon) {
     [50, 70, 36, 84],
     [23, 78, 28, 34],
     [-25, 135, 24, 35],
+    [36, 138, 18, 20],
+    [51, 10, 22, 32],
   ];
   return clusters.some(([clat, clon, latRange, lonRange]) => {
     return Math.abs(lat - clat) < latRange / 2 && Math.abs(lon - clon) < lonRange / 2;
   });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 boot();

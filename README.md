@@ -9,6 +9,11 @@ The current build is a standalone web app that renders a procedural Three.js glo
 - earthquake epicenter, seismic wavefronts, attenuation, and exposure
 - city heatwave intensity, air quality stress, and vulnerability
 - live USGS earthquake markers, NWS alert signals, and NOAA water-level telemetry
+- a command-center UI with cinematic, physics, and response view modes
+- a live-data assimilation blend control that changes risk scores
+- an animated 2D PDE-style scalar field preview for advection and diffusion
+- risk decomposition, solver diagnostics, and impact timelines
+- a procedural Earth render with generated land, clouds, city lights, atmosphere, live markers, and hazard cones
 
 ## Run
 

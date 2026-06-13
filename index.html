@@ -10,17 +10,41 @@
   <body>
     <main class="app-shell">
       <canvas id="earth-canvas" aria-label="Interactive 3D Earth risk visualization"></canvas>
+      <div class="scanline"></div>
 
       <header class="topbar">
-        <div>
+        <section class="brand-block">
           <p class="eyebrow">GaiaScope</p>
-          <h1>A real-time physics digital twin of Earth's danger zones.</h1>
-        </div>
-        <div class="status-pill">
-          <span class="pulse"></span>
-          Live physics sandbox
-        </div>
+          <h1>Multi-physics Earth risk engine</h1>
+          <p class="subtitle">
+            Live feeds plus simplified solvers for wind, surge, fire, smoke, seismic waves, heat, and infrastructure exposure.
+          </p>
+        </section>
+        <section class="mission-stats" aria-label="Model status">
+          <article>
+            <span>Solver</span>
+            <strong id="solverMode">Hybrid PDE</strong>
+          </article>
+          <article>
+            <span>Ensemble</span>
+            <strong id="ensembleCount">48 runs</strong>
+          </article>
+          <article>
+            <span>Assimilation</span>
+            <strong id="assimilationValue">62%</strong>
+          </article>
+          <article class="status-pill">
+            <span class="pulse"></span>
+            Live physics sandbox
+          </article>
+        </section>
       </header>
+
+      <nav class="view-switcher" aria-label="View mode">
+        <button class="is-active" type="button" data-view="cinematic">Cinematic</button>
+        <button type="button" data-view="physics">Physics</button>
+        <button type="button" data-view="response">Response</button>
+      </nav>
 
       <aside class="panel scenario-panel" aria-label="Scenario controls">
         <div class="panel-title">
@@ -30,11 +54,28 @@
 
         <div class="scenario-list" id="scenarioList"></div>
 
+        <div class="brief-card">
+          <span>Event brief</span>
+          <p id="scenarioBrief"></p>
+        </div>
+
         <label class="range-row" for="timeHorizon">
           <span>Forecast horizon</span>
           <output id="horizonValue">6h</output>
         </label>
         <input id="timeHorizon" type="range" min="1" max="24" value="6" />
+
+        <label class="range-row" for="assimilationBlend">
+          <span>Live-data blend</span>
+          <output id="blendValue">62%</output>
+        </label>
+        <input id="assimilationBlend" type="range" min="0" max="100" value="62" />
+
+        <label class="range-row" for="simSpeed">
+          <span>Simulation speed</span>
+          <output id="speedValue">1.2x</output>
+        </label>
+        <input id="simSpeed" type="range" min="4" max="30" value="12" />
 
         <div class="layer-grid" aria-label="Physics layers">
           <label><input type="checkbox" data-layer="weather" checked /> Wind</label>
@@ -43,6 +84,8 @@
           <label><input type="checkbox" data-layer="flood" checked /> Flood</label>
           <label><input type="checkbox" data-layer="pollution" checked /> Smoke</label>
           <label><input type="checkbox" data-layer="infrastructure" checked /> Assets</label>
+          <label><input type="checkbox" data-layer="live" checked /> Live</label>
+          <label><input id="autoRotate" type="checkbox" checked /> Orbit</label>
         </div>
       </aside>
 
@@ -54,6 +97,11 @@
         <div class="risk-meter">
           <span id="riskMeter"></span>
         </div>
+
+        <section>
+          <h2>Risk decomposition</h2>
+          <div id="factorGrid" class="factor-grid"></div>
+        </section>
 
         <section>
           <h2>Why this is dangerous</h2>
@@ -71,6 +119,7 @@
           <span>Live feeds</span>
           <button id="refreshFeeds" type="button">Refresh</button>
         </div>
+        <p id="lastUpdated" class="last-updated">Waiting for feeds</p>
         <div id="feedStatus" class="feed-status"></div>
         <div class="live-events">
           <h2>Latest signals</h2>
@@ -78,21 +127,44 @@
         </div>
       </aside>
 
+      <section class="panel physics-panel" aria-label="Physics diagnostics">
+        <div class="panel-title">
+          <span>Physics lab</span>
+          <strong id="modelResidual">Residual 0.18</strong>
+        </div>
+        <canvas id="field-canvas" width="320" height="180" aria-label="Animated physics scalar field"></canvas>
+        <div class="diagnostics-grid">
+          <article>
+            <span>CFL</span>
+            <strong id="cflValue">0.42</strong>
+          </article>
+          <article>
+            <span>Diffusion</span>
+            <strong id="diffusionValue">0.018</strong>
+          </article>
+          <article>
+            <span>Vorticity</span>
+            <strong id="vorticityValue">0.77</strong>
+          </article>
+        </div>
+        <div id="impactTimeline" class="impact-timeline"></div>
+      </section>
+
       <section class="telemetry-strip" aria-label="Simulation telemetry">
         <article>
-          <span>Wind</span>
+          <span id="telemetryLabel0">Wind</span>
           <strong id="windTelemetry">64 kt</strong>
         </article>
         <article>
-          <span>Moisture</span>
+          <span id="telemetryLabel1">Moisture</span>
           <strong id="moistureTelemetry">82%</strong>
         </article>
         <article>
-          <span>Exposure</span>
+          <span id="telemetryLabel2">Exposure</span>
           <strong id="exposureTelemetry">1.8M</strong>
         </article>
         <article>
-          <span>Uncertainty</span>
+          <span id="telemetryLabel3">Uncertainty</span>
           <strong id="uncertaintyTelemetry">+/-14%</strong>
         </article>
       </section>
